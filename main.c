@@ -5,7 +5,6 @@
 #define REGUDP "59000"
 
 typedef struct _node{
-    char ring[4];
     char id[3];
     char IP[16];
     char port[6];
@@ -71,6 +70,7 @@ int consoleInput(Socket *regSERV, Node *self){
     char str[100], command[8], arg1[5], arg2[8], arg3[8], arg4[8], message[100];
     int offset = 0;
     static int connected = 0;
+    static char ring[4];
 
     fgets(str, 100, stdin);
 
@@ -83,10 +83,11 @@ int consoleInput(Socket *regSERV, Node *self){
                 return 0;
             }
             if (sscanf(str + offset, "%s %s", arg1, arg2) == 2){
-                strcpy(self->id, arg2); strcpy(self->ring, arg1);
-                registerInServer(regSERV, arg1, self);
-                getNodesServer(regSERV, arg1);
-                connected = 1;
+                strcpy(self->id, arg2); strcpy(ring, arg1);
+                if(registerInServer(regSERV, arg1, self)){
+                    getNodesServer(regSERV, arg1);
+                    connected = 1;
+                } 
             } else printf("Invalid interface command!\n");
         }
         // DIRECT JOIN [id] [succid] [succIP] [succTCP]
@@ -135,15 +136,18 @@ int consoleInput(Socket *regSERV, Node *self){
         }
         // LEAVE
         else if (strcmp(command, "l") == 0) {          
-            unregisterInServer(regSERV, self->ring, self);
-            getNodesServer(regSERV, self->ring);
-            connected = 0;          
+            if(connected && unregisterInServer(regSERV, ring, self)){
+                getNodesServer(regSERV, ring);
+                connected = 0; 
+            }         
         }
         // EXIT
         else if (strcmp(command, "x") == 0) {          
-            printf("Application Closed!");
-            unregisterInServer(regSERV, self->ring, self);
-            getNodesServer(regSERV, self->ring);
+            printf("Application Closing!\n");
+            if(connected && unregisterInServer(regSERV, ring, self) ){
+                getNodesServer(regSERV, ring);
+                connected = 0; 
+            } 
             return 1;             
         }
         else {
