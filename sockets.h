@@ -12,7 +12,7 @@
 
 #include <errno.h>
 
-#define BUFFER_SIZE 128
+#define BUFFER_SIZE 1024
 
 typedef struct _socket Socket;
 typedef struct _tcp_server_connection TCPserverConn;
@@ -68,6 +68,14 @@ void Recieve(Socket *sock, char *buffer);
  * @param sock Socket* to close and free.
  */
 void closeSocket(Socket *sock);
+
+/**
+ * @brief Get the file descriptor of a Socket.
+ * 
+ * @param sock Pointer to socket
+ * @return int File Descriptor relative to given Socket
+ */
+int getFD_Socket(Socket *sock);
 
 //SERVED SIDED
 
@@ -144,3 +152,11 @@ int TCPserverSend(TCPserverConn *conn, char *message);
  * @param buffer String to write recieved message.
  */
 void TCPserverRecieve(TCPserverConn *conn, char *buffer);
+
+/**
+ * @brief Get the File Descriptor of a TCP connection (server-sided)
+ * 
+ * @param conn Pointer to TCP client connection
+ * @return int File Descriptor relative to given connection;
+ */
+int getFD_TCPConn(TCPserverConn *conn);

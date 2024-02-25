@@ -187,6 +187,10 @@ void Recieve(Socket *sock, char *buffer){
     }
 }
 
+int getFD_Socket(Socket *sock){
+    return sock->fd;
+}
+
 /**
  * SERVER SIDE CODE
  */
@@ -289,4 +293,8 @@ void TCPserverRecieve(TCPserverConn *conn, char *buffer){
         nleft -= nread;
         ptr += nread;
     }
+}
+
+int getFD_TCPConn(TCPserverConn *conn){
+    return conn->fd;
 }
