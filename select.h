@@ -2,6 +2,9 @@
 #include <time.h>
 #include <stdlib.h>
 
+#ifndef SELECT_H_
+#define SELECT_H_
+
 /**
  * @brief This new structure will handle the file descriptor to be listened to.
  */
@@ -58,3 +61,5 @@ void freeSelect(Select *s);
  * @return int 0 if timed-out, -1 in case of error or the number of fds ready to be read
  */
 int listenSelect(Select *s, int timeout);
+
+#endif

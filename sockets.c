@@ -4,16 +4,25 @@ extern int errno;
 
 typedef struct _socket{
     int fd;
+    int type;
 
     struct addrinfo *res;
     char *port;
-}Socket;
-
-typedef struct _tcp_server_connection{
-    int fd;
     socklen_t addrlen;
     struct sockaddr addr;
-}TCPserverConn;
+}Socket;
+
+/**
+ * Returns type of Socket:
+ * 
+ * 1 - TCP
+ * 2 - UDP 
+ */
+int typeSocket(Socket *sock){
+    int type = sock->res->ai_socktype;
+    //printf("Type: %d\n", type);
+    return type;
+}
 
 /*Creates a generic socket structure*/
 Socket *initSocket(int domain, int type, int protocol, int flags, char *node, char *service){
@@ -42,12 +51,13 @@ Socket *initSocket(int domain, int type, int protocol, int flags, char *node, ch
     }else
         new_sock->port = NULL;
 
+    new_sock->type = typeSocket(new_sock);
     return new_sock;
 }
 
 /*Closes a socket*/
 void closeSocket(Socket *sock){
-    freeaddrinfo(sock->res);
+    if(sock->res != NULL) freeaddrinfo(sock->res);
     if(sock->port != NULL) free(sock->port);
     close(sock->fd);
 
@@ -83,18 +93,6 @@ void getAdress(Socket* sock){
     }
 }
 
-/**
- * Returns type of Socket:
- * 
- * 1 - TCP
- * 2 - UDP 
- */
-int typeSocket(Socket *sock){
-    int type = sock->res->ai_socktype;
-    //printf("Type: %d\n", type);
-    return type;
-}
-
 /*Return a simple UDP socket structure*/
 Socket *UDPSocket(char *node, char *service){
     return initSocket(AF_INET, SOCK_DGRAM, 0, AI_CANONNAME, node, service);
@@ -121,19 +119,18 @@ Socket *TCPSocket(char *node, char *service){
 }
 
 int Send(Socket *sock, char *message){
-    int type = typeSocket(sock);
     char *ptr, *buffer = (char*)calloc(BUFFER_SIZE, sizeof(char));
     //Ensures that any string can enter the buffer, if size > BUFFER_SIZE, string won't be fully sent
     strcpy(buffer, message);
 
     //Is UDP
-    if(type == 2){
+    if(sock->type == 2){
         int n = sendto(sock->fd, buffer, BUFFER_SIZE, 0, sock->res->ai_addr, sock->res->ai_addrlen);
         if(n == -1){
             printf("Error Sending message: %s...\n", message);
             return 0;
         }
-    }else if(type == 1){
+    }else if(sock->type == 1){
         //Is TCP
         int nleft = BUFFER_SIZE, nwritten;
         ptr = buffer;
@@ -154,10 +151,9 @@ int Send(Socket *sock, char *message){
 /*VER A QUESTÃO DOS TIME-OUTS*/
 void Recieve(Socket *sock, char *buffer){
     int errcode;
-    int type = typeSocket(sock);
     char host[NI_MAXHOST], service[NI_MAXSERV];
 
-    if(type == 2){
+    if(sock->type == 2){
         //Is UDP
         struct sockaddr addr;
         socklen_t addrlen = sizeof(addr);
@@ -174,7 +170,7 @@ void Recieve(Socket *sock, char *buffer){
             fprintf(stderr,"error: getnameinfo: %s\n",gai_strerror(errcode));
         else
             printf("Recieved from: [%s:%s]\n",host,service);
-    }else if(type == 1){
+    }else if(sock->type == 1){
         //Is TCP
         char *ptr = buffer;
         int nleft = BUFFER_SIZE, nread;
@@ -247,28 +243,24 @@ Socket *TCPserverSocket(char *service, int queue_size){
     return new;
 }
 
-TCPserverConn *TCPserverAccept(Socket *sock){
+Socket *TCPserverAccept(Socket *sock){
     int newfd;
     struct sockaddr addr;
     socklen_t addrlen;
 
-    TCPserverConn *new = (TCPserverConn*)calloc(1, sizeof(TCPserverConn));
+    Socket *new = (Socket*)calloc(1, sizeof(Socket));
     if((newfd=accept(sock->fd, &addr, &addrlen))==-1){
         printf("Error accepting connections...\n");
         return NULL;
     }
 
     new->addr = addr; new->addrlen = addrlen; new->fd = newfd;
+    new->type = 1;
 
     return new;
 }
-
-void TCPserverCloseConnection(TCPserverConn *conn){
-    close(conn->fd);
-    free(conn);
-}
-
-int TCPserverSend(TCPserverConn *conn, char *message){
+/*
+int TCPserverSend(Socket *conn, char *message){
     int nleft = BUFFER_SIZE, nwritten;
     char *ptr, *buffer = (char*)calloc(BUFFER_SIZE, sizeof(char));
     strcpy(buffer, message);
@@ -284,7 +276,7 @@ int TCPserverSend(TCPserverConn *conn, char *message){
     return 1;
 }
 
-void TCPserverRecieve(TCPserverConn *conn, char *buffer){
+void TCPserverRecieve(Socket *conn, char *buffer){
     char *ptr = buffer;
     int nleft = BUFFER_SIZE, nread;
     while(nleft > 0){
@@ -294,7 +286,4 @@ void TCPserverRecieve(TCPserverConn *conn, char *buffer){
         ptr += nread;
     }
 }
-
-int getFD_TCPConn(TCPserverConn *conn){
-    return conn->fd;
-}
+*/

@@ -12,10 +12,12 @@
 
 #include <errno.h>
 
+#ifndef SOCKETS_H_
+#define SOCKETS_H_
+
 #define BUFFER_SIZE 1024
 
 typedef struct _socket Socket;
-typedef struct _tcp_server_connection TCPserverConn;
 
 //CLIENT SIDED
 
@@ -125,33 +127,7 @@ Socket *TCPserverSocket(char *service, int queue_size);
  * @param sock Recieving Socket*
  * @return TCPserverConn* -> New connection (socket), NULL in case of error.
  */
-TCPserverConn *TCPserverAccept(Socket *sock);
-
-/**
- * @brief Closes a connection with another machine.
- * 
- * @param conn Connection to close.
- */
-void TCPserverCloseConnection(TCPserverConn *conn);
-
-/**
- * @brief 
- * 
- * @param conn Connesction to send message to.
- * @param message Message to send, max size should be BUFFER_SIZE.
- * @return int -> 1 if succecefuly sent, 0 otherwise.
- */
-int TCPserverSend(TCPserverConn *conn, char *message);
-
-/**
- * @brief Waits for a message to be sent to this machine.
- * 
- * @warning The code will be blocked here waiting for new messages from said connection.
- * 
- * @param conn Connection to wait for the message.
- * @param buffer String to write recieved message.
- */
-void TCPserverRecieve(TCPserverConn *conn, char *buffer);
+Socket *TCPserverAccept(Socket *sock);
 
 /**
  * @brief Get the File Descriptor of a TCP connection (server-sided)
@@ -159,4 +135,6 @@ void TCPserverRecieve(TCPserverConn *conn, char *buffer);
  * @param conn Pointer to TCP client connection
  * @return int File Descriptor relative to given connection;
  */
-int getFD_TCPConn(TCPserverConn *conn);
+int getFD_TCPConn(Socket *conn);
+
+#endif
