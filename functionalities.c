@@ -69,19 +69,49 @@ int unregisterInServer(Socket *server, char *ring, Nodes *n){
     }
 }
 
-void getNodesServer(Socket *server, char *ring){
-    char buffer[1024];
+char *getNodesServer(Socket *server, char *ring){
+    char *buffer =(char*)malloc(sizeof(char)*BUFFER_SIZE);
 
     sprintf(buffer, "NODES %s", ring);
     Send(server, buffer);
     Recieve(server, buffer);
 
     printf("%s\n", buffer);
+
+    return buffer;
 }
 
-int join(Nodes *n, char *succID, char *succIP, char *succTCP){
+void isNodeInServer(char *nodeslist, char *selfID){
+    //Skip NODESLIST r\n
+    char *aux;
+    char succID[4], succIP[16], succTCP[8];
+
+    char id[4]; strcpy(id, selfID);
+
+    int available, i=0;
+    while(1){
+        aux = nodeslist+14;
+        available = 1;
+        while(sscanf(aux, "%s %s %s", succID, succIP, succTCP)==3){
+            if(strcmp(id, succID)==0){
+                available = 0;
+                i = (id[0]-48)*10 + (id[1]-48);
+                i++;
+                id[0] = (i%100 - i%10)/10 + 48;
+                id[1] = (i%10) + 48;
+                break;
+            }
+            aux += 3+strlen(succID)+strlen(succIP)+strlen(succTCP);
+        }
+        if(available) break;
+    }
+    printf("Id choosen: %s\n", id);
+    return;
+}
+
+int directJoin(Nodes *n, char *succID, char *succIP, char *succTCP){
     char *buffer = (char*)malloc(BUFFER_SIZE*sizeof(char));
-    printf("Attempting to join to: %s %s:%s\n", succID, succIP, succTCP);
+    //printf("Attempting to join to: %s %s:%s\n", succID, succIP, succTCP);
     //New select structure to listen to incoming data from sockets
     Select *s = newSelect();
     //Attempt to connect to the succ node
@@ -138,4 +168,22 @@ int join(Nodes *n, char *succID, char *succIP, char *succTCP){
     free(buffer);
     freeSelect(s);
     return 1;
+}
+
+int join(Socket *regSERV, Nodes *n, char *ring){
+    char succID[3], succIP[16], succTCP[8];
+    //Gets the list of connected Nodes
+    char *aux = getNodesServer(regSERV, ring);
+    //Ensures that out id is unique, if it isn't we try to get a new one
+    isNodeInServer(aux, n->selfID);
+    //Skip NODESLIST r\n
+    if(sscanf(aux+14, "%s %s %s", succID, succIP, succTCP)!=3){
+        //The ring is empty
+        free(aux);
+        return 1;
+    }else{
+        free(aux);
+        return directJoin(n, succID, succIP, succTCP);
+    }
+
 }

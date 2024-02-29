@@ -24,9 +24,8 @@ int consoleInput(Socket *regSERV, Nodes *n){
             }
             if (sscanf(str + offset, "%s %s", arg1, arg2) == 2){
                 strcpy(n->selfID, arg2); strcpy(ring, arg1);
-                if(registerInServer(regSERV, arg1, n)){
-                    getNodesServer(regSERV, arg1);
-                    connected = 1;
+                if(join(regSERV, n, ring)){
+                    if(registerInServer(regSERV, ring, n)) connected = 1;
                 } 
             } else printf("Invalid interface command!\n");
         }
@@ -38,7 +37,7 @@ int consoleInput(Socket *regSERV, Nodes *n){
             }
             if (sscanf(str + offset, "%s %s %s %s", arg1, arg2, arg3, arg4) == 4){
                 strcpy(n->selfID, arg1);
-                if(join(n, arg2, arg3, arg4)) connected = 1;
+                if(directJoin(n, arg2, arg3, arg4)) connected = 1;
             } else printf("Invalid interface command!\n");
         }
         // CHORD
