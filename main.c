@@ -102,6 +102,26 @@ int consoleInput(Socket *regSERV, Nodes *n){
             }
             return 1;             
         }
+        else if(strcmp(command, "clear") == 0){
+            if(sscanf(str+6, "%s", arg1)){
+                char *aux = getNodesServer(regSERV, arg1), *aux1;
+                char ID[4], IP[16], TCP[8], buffer[32];
+                aux1 = aux + 14;
+                while(sscanf(aux1, "%s %s %s", ID, IP, TCP)==3){
+                    sprintf(buffer, "UNREG %s %s", arg1, ID);
+                    Send(regSERV, buffer); Recieve(regSERV, buffer);
+                    printf("%s\n", buffer);
+                    aux1 += 3+strlen(ID)+strlen(IP)+strlen(TCP);
+                }
+                free(aux);
+            }
+        }
+        else if(strcmp(command, "nodes") == 0){
+            if(sscanf(str+6, "%s", arg1)){
+                char *aux = getNodesServer(regSERV, arg1);
+                free(aux);
+            }
+        }
         else {
             printf("Invalid interface command!\n");
         }
@@ -146,6 +166,7 @@ int main(int argc, char *argv[]){
             if(checkFD(s, getFD_Socket(listenTCP))){
                 char buffer[1024];
                 Socket *new = TCPserverAccept(listenTCP);
+                if(new == NULL) continue;
                 Recieve(new, buffer);
                 printf("%s\n", buffer);
                 Send(new, "Away RAT!\n");

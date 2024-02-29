@@ -247,10 +247,11 @@ Socket *TCPserverAccept(Socket *sock){
     int newfd;
     struct sockaddr addr;
     socklen_t addrlen;
+    addrlen = sizeof(addr);
 
     Socket *new = (Socket*)calloc(1, sizeof(Socket));
     if((newfd=accept(sock->fd, &addr, &addrlen))==-1){
-        printf("Error accepting connections...\n");
+        printf("[FD: %d] Error accepting connections...\n", sock->fd);
         return NULL;
     }
 

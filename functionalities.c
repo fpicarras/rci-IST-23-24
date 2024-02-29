@@ -117,7 +117,7 @@ int directJoin(Nodes *n, char *succID, char *succIP, char *succTCP){
     //Attempt to connect to the succ node
     Socket *succ = TCPSocket(succIP, succTCP);
     if(succ == NULL){
-        printf("Unable to connec to to succesor %s\n", succID);
+        printf("Unable to connec to succesor %s\n", succID);
         return 0;
     }
     //If connection as succeceful fill n with the succ info
@@ -179,6 +179,9 @@ int join(Socket *regSERV, Nodes *n, char *ring){
     //Skip NODESLIST r\n
     if(sscanf(aux+14, "%s %s %s", succID, succIP, succTCP)!=3){
         //The ring is empty
+        strcpy(n->succID, n->selfID); strcpy(n->succIP, n->selfIP); strcpy(n->succTCP, n->selfTCP);
+        strcpy(n->ssuccID, n->selfID); strcpy(n->ssuccIP, n->selfIP); strcpy(n->ssuccTCP, n->selfTCP);
+        strcpy(n->predID, n->selfID);
         free(aux);
         return 1;
     }else{
