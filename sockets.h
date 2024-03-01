@@ -61,15 +61,19 @@ int Send(Socket *sock, char *message);
  * 
  * @param sock Socket to wait for message.
  * @param buffer String to write recieving message to.
+ * 
+ * @return Number of bytes read.
  */
-void Recieve(Socket *sock, char *buffer);
+int Recieve(Socket *sock, char *buffer);
 
 /**
  * @brief Closes a socket and frees the memory allocated for the structure.
  * 
  * @param sock Socket* to close and free.
+ * @param close_fd Bool that tells if the file descriptor of the socket will be closed or not,
+ * useful in some cases, set to 1 to close it, 0 otherwise.
  */
-void closeSocket(Socket *sock);
+void closeSocket(Socket *sock, int close_fd);
 
 /**
  * @brief Get the file descriptor of a Socket.

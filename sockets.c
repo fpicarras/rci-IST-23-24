@@ -56,10 +56,10 @@ Socket *initSocket(int domain, int type, int protocol, int flags, char *node, ch
 }
 
 /*Closes a socket*/
-void closeSocket(Socket *sock){
+void closeSocket(Socket *sock, int close_fd){
     if(sock->res != NULL) freeaddrinfo(sock->res);
     if(sock->port != NULL) free(sock->port);
-    close(sock->fd);
+    if(close_fd) close(sock->fd);
 
     free(sock);
 }
@@ -112,7 +112,7 @@ Socket *TCPSocket(char *node, char *service){
     n = connect(new->fd, new->res->ai_addr, new->res->ai_addrlen);
     if(n == -1){
         printf("Error connecting to %s...\n", new->res->ai_canonname);
-        closeSocket(new);
+        closeSocket(new, 1);
         return NULL;
     }
     return new;
@@ -149,7 +149,7 @@ int Send(Socket *sock, char *message){
 }
 
 /*VER A QUESTÃO DOS TIME-OUTS*/
-void Recieve(Socket *sock, char *buffer){
+int Recieve(Socket *sock, char *buffer){
     int errcode;
     char host[NI_MAXHOST], service[NI_MAXSERV];
 
@@ -162,7 +162,7 @@ void Recieve(Socket *sock, char *buffer){
 
         if(n == -1){
             printf("Error recieving...\n");
-            return;
+            return -1;
         }
         buffer[n] = '\0';
 
@@ -170,6 +170,7 @@ void Recieve(Socket *sock, char *buffer){
             fprintf(stderr,"error: getnameinfo: %s\n",gai_strerror(errcode));
         else
             printf("Recieved from: [%s:%s]\n",host,service);
+        return n;
     }else if(sock->type == 1){
         //Is TCP
         char *ptr = buffer;
@@ -180,7 +181,9 @@ void Recieve(Socket *sock, char *buffer){
             nleft -= nread;
             ptr += nread;
         }
+        return nread;
     }
+    return -1;
 }
 
 int getFD_Socket(Socket *sock){
@@ -196,7 +199,7 @@ Socket *UDPserverSocket(char *service){
 
     if(bind(new->fd, new->res->ai_addr, new->res->ai_addrlen)==-1){
         printf("Error binding port!\n"); 
-        closeSocket(new);
+        closeSocket(new, 1);
         return NULL;
     }
     return new;
@@ -232,12 +235,12 @@ Socket *TCPserverSocket(char *service, int queue_size){
     Socket *new = initSocket(AF_INET, SOCK_STREAM, 0, AI_PASSIVE, NULL, service);
     if(bind(new->fd, new->res->ai_addr, new->res->ai_addrlen)==-1){
         printf("Error binding port!\n");
-        closeSocket(new);
+        closeSocket(new, 1);
         return NULL;
     }
     if(listen(new->fd, queue_size)==-1){
         printf("Error on commanding Kernel to accept incomming connections...\n");
-        closeSocket(new);
+        closeSocket(new, 1);
         return NULL;
     }
     return new;

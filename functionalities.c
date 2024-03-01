@@ -17,7 +17,6 @@ typedef struct _nodes{
     char ssuccID[3];
     char ssuccIP[16];
     char ssuccTCP[6];
-    Socket *ssuccSOCK;
 
     char predID[3];
     Socket *predSOCK;
@@ -76,7 +75,7 @@ char *getNodesServer(Socket *server, char *ring){
     Send(server, buffer);
     Recieve(server, buffer);
 
-    printf("%s\n", buffer);
+    //printf("%s\n", buffer);
 
     return buffer;
 }
@@ -109,7 +108,7 @@ void isNodeInServer(char *nodeslist, char *selfID){
     return;
 }
 
-int directJoin(Nodes *n, char *succID, char *succIP, char *succTCP){
+int directJoin(Nodes *n, Select *sel, char *succID, char *succIP, char *succTCP){
     char *buffer = (char*)malloc(BUFFER_SIZE*sizeof(char));
     //printf("Attempting to join to: %s %s:%s\n", succID, succIP, succTCP);
     //New select structure to listen to incoming data from sockets
@@ -120,7 +119,8 @@ int directJoin(Nodes *n, char *succID, char *succIP, char *succTCP){
         printf("Unable to connec to succesor %s\n", succID);
         return 0;
     }
-    //If connection as succeceful fill n with the succ info
+    //If connection as succeceful fill n with the succ info -> s(self) = succ
+    addFD(sel, getFD_Socket(succ));
     strcpy(n->succID, succID); strcpy(n->succIP, succIP); strcpy(n->succTCP, succTCP);
     n->succSOCK = succ;
     //Sending the ENTRY command
@@ -139,7 +139,7 @@ int directJoin(Nodes *n, char *succID, char *succIP, char *succTCP){
     }else{
         //In case of time-out
         printf("Timed-out waiting for succ %s after %d seconds...\n", succID, TIME_OUT);
-        closeSocket(succ);
+        closeSocket(succ, 1);
         free(buffer);
         freeSelect(s);
         return 0;
@@ -152,14 +152,16 @@ int directJoin(Nodes *n, char *succID, char *succIP, char *succTCP){
     if(listenSelect(s, TIME_OUT) > 0){
         //If the pred connected we will wait for its response
         if(checkFD(s, getFD_Socket(n->selfSOCK))){
+            // p(self) = pred
             n->predSOCK = TCPserverAccept(n->selfSOCK);
             Recieve(n->predSOCK, buffer);
             sscanf(buffer, "PRED %s\n", n->predID);
+            addFD(sel, getFD_Socket(n->predSOCK));
         }
     }else{
         //In case of time-out
         printf("Timed-out waiting for pred after %d seconds...\n", TIME_OUT);
-        closeSocket(succ);
+        closeSocket(succ, 1);
         free(buffer);
         freeSelect(s);
         return 0;
@@ -170,7 +172,7 @@ int directJoin(Nodes *n, char *succID, char *succIP, char *succTCP){
     return 1;
 }
 
-int join(Socket *regSERV, Nodes *n, char *ring){
+int join(Socket *regSERV, Nodes *n, Select *sel, char *ring){
     char succID[3], succIP[16], succTCP[8];
     //Gets the list of connected Nodes
     char *aux = getNodesServer(regSERV, ring);
@@ -186,7 +188,43 @@ int join(Socket *regSERV, Nodes *n, char *ring){
         return 1;
     }else{
         free(aux);
-        return directJoin(n, succID, succIP, succTCP);
+        return directJoin(n, sel, succID, succIP, succTCP);
     }
 
+}
+
+void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
+    char buffer[64], newID[4], newIP[16], newTCP[8];
+
+    sscanf(msg, "ENTRY %s %s %s\n", newID, newIP, newTCP);
+    printf("ENTRY: %s %s %s\n", newID, newIP, newTCP);
+
+    //Same IDs means we are alone in the ring
+    if(strcmp(n->succID, n->selfID)==0){
+        //p(self) = new
+        strcpy(n->predID, newID); n->predSOCK = new_node;
+        addFD(s, getFD_Socket(new_node));
+
+        sprintf(buffer, "SUCC %s %s %s\n", newID, newIP, newTCP);
+        Send(new_node, buffer);
+
+        //s(self) = new
+        n->succSOCK = TCPSocket(newIP, newTCP);
+        sprintf(buffer, "PRED %s\n", n->selfID);
+        Send(n->succSOCK, buffer);
+        strcpy(n->succID, newID); strcpy(n->succIP, newIP); strcpy(n->succTCP, newTCP);
+        addFD(s, getFD_Socket(n->succSOCK));
+    }else{
+        sprintf(buffer, "ENTRY %s %s %s\n", newID, newIP, newTCP);
+        Send(n->predSOCK, buffer);
+        sprintf(buffer, "SUCC %s %s %s\n", n->succID, n->succIP, n->succTCP);
+        Send(new_node, buffer);
+        //p(self) = new
+        //Removes the fd of pred from current select
+        removeFD(s, getFD_Socket(n->predSOCK));
+        closeSocket(n->predSOCK, 0);
+        strcpy(n->predID, newID); n->predSOCK = new_node;
+        //Adds the new fd to the select
+        addFD(s, getFD_Socket(n->predSOCK));
+    }
 }
