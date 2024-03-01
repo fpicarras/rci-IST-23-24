@@ -91,6 +91,13 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                 if(!(strcmp(ring, "---")==0) && unregisterInServer(regSERV, ring, n)){
                     getNodesServer(regSERV, ring);
                     strcpy(ring, "---");
+                    
+                    printf("Here!\n"); fflush(stdout);
+                    if(n->predSOCK != NULL && n->succSOCK != NULL){
+                        removeFD(s, getFD_Socket(n->predSOCK)); removeFD(s, getFD_Socket(n->succSOCK));
+                        closeSocket(n->predSOCK, 1); closeSocket(n->succSOCK, 1);
+                        n->predSOCK = NULL; n->succSOCK = NULL;
+                    }
                 }
                 connected = 0;
             }             
@@ -103,8 +110,9 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                 if(!(strcmp(ring, "---")==0) && unregisterInServer(regSERV, ring, n)){
                     getNodesServer(regSERV, ring);
                     strcpy(ring, "---");
-
-                    closeSocket(n->predSOCK, 1); closeSocket(n->succSOCK, 1);
+                    if(n->predSOCK != NULL && n->succSOCK != NULL){
+                        closeSocket(n->predSOCK, 1); closeSocket(n->succSOCK, 1);
+                    }
                 }
                 connected = 0;
             }
@@ -157,6 +165,7 @@ int main(int argc, char *argv[]){
 
     //Ciramos um servidor TCP para ouvir outros n´os e um a comunicaç~ao com o server UDP
     Socket *listenTCP = TCPserverSocket(TCP, 15);
+    if(listenTCP == NULL) return 1;
     Socket *regSERV = UDPSocket(regIP, regUDP);
     
     Socket *new = NULL;
@@ -248,6 +257,7 @@ int main(int argc, char *argv[]){
     removeFD(s, getFD_Socket(listenTCP));
     closeSocket(regSERV, 1); closeSocket(listenTCP, 1);
     freeSelect(s);
+    free(n);
 
     return 0;
 }
