@@ -169,7 +169,7 @@ int Recieve(Socket *sock, char *buffer){
         if((errcode=getnameinfo(&addr,addrlen,host,sizeof(host),service,sizeof(service),0))!=0)
             fprintf(stderr,"error: getnameinfo: %s\n",gai_strerror(errcode));
         else
-            printf("Recieved from: [%s:%s]\n",host,service);
+            //printf("Recieved from: [%s:%s]\n",host,service);
         return n;
     }else if(sock->type == 1){
         //Is TCP
