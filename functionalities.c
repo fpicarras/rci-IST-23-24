@@ -239,7 +239,7 @@ void handlePredDisconnect(Nodes *n, Select *s){
 
 void handleSuccCommands(Nodes *n, Select *s, char *msg){
     char auxID[4], auxIP[16], auxTCP[8], buffer[BUFFER_SIZE], command[16];
-    Socket *new;
+    Socket *new = NULL;
 
     if(sscanf(msg, "%s", command)){
         if(strcmp(command, "ENTRY")==0){
@@ -261,7 +261,7 @@ void handleSuccCommands(Nodes *n, Select *s, char *msg){
             addFD(s, getFD_Socket(new)); n->succSOCK = new;
             Send(new, buffer);
         }else if(strcmp(command, "SUCC")==0){
-            sscanf(buffer, "SUCC %s %s %s\n", n->ssuccID, n->ssuccIP, n->ssuccTCP);
+            sscanf(msg, "SUCC %s %s %s\n", n->ssuccID, n->ssuccIP, n->ssuccTCP);
         }
     }
 }
@@ -284,7 +284,7 @@ void handleNewConnection(Nodes *n, Select *s, Socket *new, char *msg){
     }
 }
 
-int consoleInput(Socket *regSERV, Nodes *n, Select *s){
+int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
     char str[100], command[8], arg1[5], arg2[16], arg3[16], arg4[16], message[128];
     int offset = 0;
     static int connected = 0;
@@ -338,19 +338,25 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
         }
         // SHOW ROUTING [dest]
         else if (strcmp(command, "sr") == 0) {
-            if (sscanf(str + offset, "%s", arg1) == 1){
-                /****/
-            } else printf("Invalid interface command!\n");
+            if(connected){
+                if (sscanf(str + offset, "%s", arg1) == 1){
+                    ShowRouting (atoi(arg1), e->routing);
+                } else printf("Invalid interface command!\n");
+            } else printf("Not connected...\n\n");
         }
         // SHOW PATH [dest]
         else if (strcmp(command, "sp") == 0) {
-            if (sscanf(str + offset, "%s", arg1) == 1){
-                /****/
-            } else printf("Invalid interface command!\n");
+            if(connected){
+                if (sscanf(str + offset, "%s", arg1) == 1){
+                    ShowPath (atoi(arg1), e->shorter_path);
+                } else printf("Invalid interface command!\n");
+            } else printf("Not connected...\n\n");  
         }
         // SHOW FORWARDING
         else if (strcmp(command, "sf") == 0) {          
-            /****/             
+            if(connected){      
+                ShowFowarding (e->fowarding); 
+            } else printf("Not connected...\n\n"); 
         }
         // MESSAGE [dest] [message]
         else if (strcmp(command, "m") == 0) {

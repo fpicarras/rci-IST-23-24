@@ -1,3 +1,4 @@
+#include "fowarding.h" 
 #include "sockets.h"
 #include "select.h"
 
@@ -93,6 +94,6 @@ void handlePredDisconnect(Nodes *n, Select *s);
  * @param s Select struct with the file descriptors to be read when using the select() command.
  * @return int 1 if the program can end, 0 otherwise.
  */
-int consoleInput(Socket *regSERV, Nodes *n, Select *s);
+int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento*);
 
 #endif

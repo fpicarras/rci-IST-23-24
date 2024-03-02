@@ -2,6 +2,7 @@
 #include "select.h"
 #include "functionalities.h"
 
+
 #define REGIP "193.136.138.142"
 #define REGUDP "59000"
 
@@ -32,6 +33,8 @@ int main(int argc, char *argv[]){
     //Adicionar o porto de escuta
     addFD(s, getFD_Socket(listenTCP));  
 
+    Encaminhamento *e = initEncaminhamento();
+
     /**
      * @brief Neste loop estaremos a ouvir os descritores, para este exemplo, apenas stdin e o porto de esctuta TCP.
      * Quando algum deles se acusar, a funç~ao listenSelect desbloqueia e tratamos desse respetivo fd.
@@ -41,7 +44,7 @@ int main(int argc, char *argv[]){
         else{
 //Keyboard Input
             if(checkFD(s, 0)) 
-                if(consoleInput(regSERV, n, s)) break;
+                if(consoleInput(regSERV, n, s, e)) break;
 //Handle a new connection
             if(checkFD(s, getFD_Socket(listenTCP))){
                 new = TCPserverAccept(listenTCP);
@@ -60,6 +63,7 @@ int main(int argc, char *argv[]){
                 }else {
                     //Handle remaining commands from succ
                     printf("[succ]: %s\n", buffer);
+                    //printf ("%d", n);
                     handleSuccCommands(n, s, buffer);
                 }
             }
@@ -82,6 +86,7 @@ int main(int argc, char *argv[]){
     removeFD(s, 0);
     removeFD(s, getFD_Socket(listenTCP));
     closeSocket(regSERV, 1); closeSocket(listenTCP, 1);
+    deleteEncaminhamento(e);
     freeSelect(s);
     free(n);
 
