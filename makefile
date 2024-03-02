@@ -1,6 +1,6 @@
 NAME = COR
 FILES = sockets.c select.c
-CFLAGS = -Wall -O3
+CFLAGS = -Wall -O3 -g
 
 all:
 	gcc -o $(NAME) main.c $(FILES) $(CFLAGS)

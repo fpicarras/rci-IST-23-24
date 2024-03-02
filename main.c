@@ -89,15 +89,12 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
             if(connected){
                 /* DISCONNECT FROM NODES */
                 if(!(strcmp(ring, "---")==0) && unregisterInServer(regSERV, ring, n)){
-                    getNodesServer(regSERV, ring);
                     strcpy(ring, "---");
-                    
-                    printf("Here!\n"); fflush(stdout);
-                    if(n->predSOCK != NULL && n->succSOCK != NULL){
-                        removeFD(s, getFD_Socket(n->predSOCK)); removeFD(s, getFD_Socket(n->succSOCK));
-                        closeSocket(n->predSOCK, 1); closeSocket(n->succSOCK, 1);
-                        n->predSOCK = NULL; n->succSOCK = NULL;
-                    }
+                }
+                if(n->predSOCK != NULL && n->succSOCK != NULL){
+                    removeFD(s, getFD_Socket(n->predSOCK)); removeFD(s, getFD_Socket(n->succSOCK));
+                    closeSocket(n->predSOCK, 1); closeSocket(n->succSOCK, 1);
+                    n->predSOCK = NULL; n->succSOCK = NULL;
                 }
                 connected = 0;
             }             
@@ -108,11 +105,10 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
             if(connected){
                 /* DISCONNECT FROM NODES */
                 if(!(strcmp(ring, "---")==0) && unregisterInServer(regSERV, ring, n)){
-                    getNodesServer(regSERV, ring);
                     strcpy(ring, "---");
-                    if(n->predSOCK != NULL && n->succSOCK != NULL){
-                        closeSocket(n->predSOCK, 1); closeSocket(n->succSOCK, 1);
-                    }
+                }
+                if(n->predSOCK != NULL && n->succSOCK != NULL){
+                    closeSocket(n->predSOCK, 1); closeSocket(n->succSOCK, 1);
                 }
                 connected = 0;
             }
@@ -195,7 +191,6 @@ int main(int argc, char *argv[]){
                     if(strcmp(command, "ENTRY")==0) handleENTRY(n, new, s, buffer);
                     if(strcmp(command, "PRED")==0){
                         sscanf(buffer, "PRED %s\n", n->predID);
-                        printf("R.: %s\n", n->predID);
                         n->predSOCK = new; addFD(s, getFD_Socket(new));
                         sprintf(buffer, "SUCC %s %s %s\n", n->succID, n->succIP, n->succTCP);
                         Send(new, buffer);
@@ -207,15 +202,20 @@ int main(int argc, char *argv[]){
                 if(Recieve(n->succSOCK, buffer)==0){
                     //Succ disconnected
                     removeFD(s, getFD_Socket(n->succSOCK)); closeSocket(n->succSOCK, 1);
+                    if(strcmp(n->selfID, n->ssuccID)!=0){
+                        new = TCPSocket(n->ssuccIP, n->ssuccTCP);
+                        strcpy(n->succID, n->ssuccID); strcpy(n->succIP, n->ssuccIP); strcpy(n->succTCP, n->ssuccTCP);
+                        n->succSOCK = new; addFD(s, getFD_Socket(new));
+                        sprintf(buffer, "PRED %s\n", n->selfID);
+                        Send(new, buffer);
 
-                    new = TCPSocket(n->ssuccIP, n->ssuccTCP);
-                    strcpy(n->succID, n->ssuccID); strcpy(n->succIP, n->ssuccIP); strcpy(n->succTCP, n->ssuccTCP);
-                    n->succSOCK = new; addFD(s, getFD_Socket(new));
-                    sprintf(buffer, "PRED %s\n", n->selfID);
-                    Send(new, buffer);
-
-                    sprintf(buffer, "SUCC %s %s %s", n->succID, n->succIP, n->succTCP);
-                    Send(n->predSOCK, buffer);
+                        sprintf(buffer, "SUCC %s %s %s", n->succID, n->succIP, n->succTCP);
+                        Send(n->predSOCK, buffer);
+                    }else {//In case we are the only node left, we dont connect to ourself...
+                        strcpy(n->succID, n->ssuccID); strcpy(n->succIP, n->ssuccIP); strcpy(n->succTCP, n->ssuccTCP);
+                        strcpy(n->predID, n->ssuccID);
+                    }
+                    continue;
                 }
                 printf("From [succ]: %s\n", buffer);
                 if(sscanf(buffer, "%s", command)){
@@ -244,7 +244,7 @@ int main(int argc, char *argv[]){
             }
             //Predecesor sent something
             if((n->predSOCK != NULL) && checkFD(s, getFD_Socket(n->predSOCK))){
-                if(Recieve(n->predSOCK, buffer)==1){
+                if(Recieve(n->predSOCK, buffer)==0){
                     removeFD(s, getFD_Socket(n->predSOCK)); closeSocket(n->predSOCK, 1);
                 }
             }

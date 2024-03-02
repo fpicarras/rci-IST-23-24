@@ -105,6 +105,7 @@ void isNodeInServer(char *nodeslist, char *selfID){
         if(available) break;
     }
     printf("Id choosen: %s\n", id);
+    strcpy(selfID, id);
     return;
 }
 
@@ -198,6 +199,12 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
 
     sscanf(msg, "ENTRY %s %s %s\n", newID, newIP, newTCP);
     printf("ENTRY: %s %s %s\n", newID, newIP, newTCP);
+
+    if(strcmp(newID, n->selfID)==0){
+        printf("New connection trying the same id... Disconnecting from them...\n");
+        closeSocket(new_node, 1);
+        return;
+    }
 
     //Same IDs means we are alone in the ring
     if(strcmp(n->succID, n->selfID)==0){
