@@ -285,14 +285,14 @@ void handleNewConnection(Nodes *n, Select *s, Socket *new, char *msg){
 }
 
 int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
-    char str[100], command[8], arg1[5], arg2[16], arg3[16], arg4[16], message[128];
+    char str[256], command[8], arg1[8], arg2[16], arg3[16], arg4[16], message[128], buffer[256];
     int offset = 0;
     static int connected = 0;
     static char ring[] = "---";
 
-    if(fgets(str, 100, stdin)==NULL) return 0;
+    if(fgets(str, 100, stdin) == NULL) return 0;
 
-    if (sscanf(str + offset, "%s", command) == 1) {
+    if (sscanf(str, "%s", command) == 1) {
         offset += strlen(command) + 1; /* +1 para o espaço em branco */
         // JOIN [ring] [id]
         if (strcmp(command, "j") == 0) {
@@ -319,12 +319,16 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
             } else printf("Invalid interface command!\n");
         }
         // CHORD
-        else if (strcmp(command, "c") == 0) {          
-            /****/             
+        else if (strcmp(command, "c") == 0) {                     
+            if(connected){      
+                /****/   
+            } else printf("Not connected...\n\n");
         }
         // REMOVE CHORD
         else if (strcmp(command, "rc") == 0) {          
-            /****/             
+            if(connected){      
+                /****/   
+            } else printf("Not connected...\n\n");            
         }
         // SHOW TOPOLOGY
         else if (strcmp(command, "st") == 0) {
@@ -360,13 +364,17 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
         }
         // MESSAGE [dest] [message]
         else if (strcmp(command, "m") == 0) {
-            offset += strlen(arg1) + 1;
-            if (sscanf(str + offset, "%s", arg1) == 1){
-                if (sscanf(str + offset + 5, "%[^\n]", message) == 1){
-                printf ("%s", message);
-                    /****/
-                }
-            } else printf("Invalid interface command!\n");
+            if(connected){ 
+                if (sscanf(str + 2, "%s", arg1) == 1){
+                    if (sscanf(str + 5, "%[^\n]", message) != 1) exit (0);
+                    if (strcmp (arg1, n->selfID) == 0) printf ("%s\n\n", message);
+                    else {
+                        sprintf(buffer, "CHAT %s %s %s\n", n->selfID, arg1, message);
+                        Send(n->succSOCK, buffer);  /* Alterar para seguir para o nó da tabela de expedição no indice do destino !!! */
+                    } 
+                    
+                } else printf("Invalid interface command!\n");
+            } else printf("Not connected...\n\n"); 
         }
         // LEAVE
         else if (strcmp(command, "l") == 0) {     
@@ -381,7 +389,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
                     n->predSOCK = NULL; n->succSOCK = NULL;
                 }
                 connected = 0;
-            }             
+            } else printf("Not connected...\n\n");            
         }
         // EXIT
         else if (strcmp(command, "x") == 0) {          

@@ -14,8 +14,8 @@ Encaminhamento *initEncaminhamento (){
     }
     new->shorter_path = (char**) calloc (100, sizeof(char*));
     for (i = 0; i < 100; i++) new->shorter_path[i] = (char*) calloc (100, sizeof(char));
-    new->fowarding = (int*) malloc (100*sizeof(int));
-    for (i = 0; i < 100; i++) new->fowarding[i] = -1;
+    new->fowarding = (char**) calloc (100, sizeof(char*));
+    for (i = 0; i < 100; i++) new->fowarding[i] = (char*) calloc (4, sizeof(char));
 
     return new;
 }
@@ -29,6 +29,7 @@ void deleteEncaminhamento (Encaminhamento *e){
     }
     for (i = 0; i < 100; i++){
         free(e->shorter_path[i]); 
+        free(e->fowarding[i]); 
     }
     free (e->routing);
     free (e->shorter_path);
@@ -38,16 +39,16 @@ void deleteEncaminhamento (Encaminhamento *e){
 }
 
 // Shows a node's expedition table
-void ShowFowarding (int* fowarding){
+void ShowFowarding (char** fowarding){
     int i, aux = 0;
 
-    printf ("Expedition Table:\n");
     for (i = 0; i < 100; i++){
-        if (fowarding[i] == -1) continue;
+        if (strcmp (fowarding[i], "") == 0) continue;
+        if (aux == 0) printf ("Expedition Table:\n");
         aux++;
-        printf ("Neighbor: %02d, Destiny: %02d \n", i, fowarding[i]);
+        printf ("Neighbor: %02d, Destiny: %s \n", i, fowarding[i]);
     }
-    if (aux == 0) printf("Is the only node in the ring!\n");
+    if (aux <= 1) printf("Is the only node in the ring!\n");
     printf ("\n");
     return;
 }

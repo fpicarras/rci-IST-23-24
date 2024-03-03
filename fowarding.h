@@ -8,14 +8,14 @@ typedef struct _encaminhamento
 {
     char ***routing;
     char **shorter_path;
-    int *fowarding;
+    char **fowarding;
 } Encaminhamento;
 
 Encaminhamento *initEncaminhamento ();
 
 void deleteEncaminhamento (Encaminhamento*);
 
-void ShowFowarding (int*);
+void ShowFowarding (char**);
 
 void ShowPath (int, char**);
 

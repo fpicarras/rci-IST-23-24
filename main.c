@@ -9,6 +9,7 @@
 int main(int argc, char *argv[]){
     char IP[16], TCP[6], buffer[BUFFER_SIZE];
     char regIP[16] = REGIP, regUDP[6] = REGUDP;
+    char protocol[8], message[128], dest[4], origin[4];
     
     //Validamos os argumentos
     if(validateArguments(argc, argv, IP, TCP, regIP, regUDP)) return 0;
@@ -75,6 +76,17 @@ int main(int argc, char *argv[]){
                 }else {
                     //Handle remaining commands from pred
                     printf("[pred]: %s\n", buffer);
+                    if (sscanf(buffer, "%s", protocol) == 1){
+                        if (strcmp(protocol, "CHAT") == 0){
+                            if (sscanf(buffer + 5, "%s %s %[^\n]\n", origin, dest, message) != 3) exit(0);
+                            if (strcmp (dest, n->selfID) == 0){
+                                printf ("%s \n\n", message);
+                                continue;
+                            }
+                            sprintf(buffer, "CHAT %s %s %s\n", n->succID, dest, message);
+                            Send(n->succSOCK, buffer);  /* Alterar para seguir para o nó da tabela de expedição no indice do destino !!! */
+                        }
+                    }
                     //handlePredCommands(n, s, buffer);
                 }
             }
