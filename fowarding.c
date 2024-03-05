@@ -5,12 +5,15 @@ Encaminhamento *initEncaminhamento (){
     Encaminhamento *new = NULL;
     
     new = (Encaminhamento*) calloc (1, sizeof(Encaminhamento));
-    // Só tem 3 (succ, pred e 1 chord)!! Convem ver com a questão das cordas que partem de outros nós
-    new->routing = (char***) calloc (3, sizeof(char**));
-    for(i = 0; i < 3; i++){
-        new->routing[i] = (char**) calloc (101, sizeof(char*));      // Atenção aos acessos nos indices (index = node + 1)
-        new->routing[i][0] = (char*) calloc (4, sizeof(char));
-        for (j = 1; j < 101; j++) new->routing[i][j] = (char*) calloc (100, sizeof(char));
+    /* Primeira linha tem uma flag para verificar se somos adjacentes ao nó em questão */
+    new->routing = (char***) calloc (101, sizeof(char**));          
+    // Atenção aos acessos nos indices (index = node + 1)
+    for(i = 0; i < 100; i++){
+        new->routing[i] = (char**) calloc (101, sizeof(char*));      
+        for (j = 1; j < 101; j++){
+            new->routing[i][j] = (char*) calloc (100, sizeof(char));
+            if (i + 1 == j) strcpy (new->routing[i][j], "-");
+        }
     }
     new->shorter_path = (char**) calloc (100, sizeof(char*));
     for (i = 0; i < 100; i++) new->shorter_path[i] = (char*) calloc (100, sizeof(char));
@@ -23,7 +26,7 @@ Encaminhamento *initEncaminhamento (){
 void deleteEncaminhamento (Encaminhamento *e){
     int i, j;
 
-    for (i = 0; i < 3; i++){
+    for (i = 0; i < 100; i++){
         for (j = 0; j < 101; j++) free(e->routing[i][j]);
         free (e->routing[i]);
     }
@@ -67,18 +70,18 @@ void ShowPath (int node, char** path){
 void ShowRouting (int node, char*** routing){
     int i, aux = 0;
 
-    for (i = 0; i < 3; i++){
+    for (i = 0; i < 100; i++){
         if (strcmp(routing[i][0], "") == 0) aux++;
     }
     // It is not possible to reach the node -> Is not in the ring
-    if (aux == 3){
+    if (aux == 100){
         printf("Invalid destiny, node %02d is not in the ring!\n\n", node);
         return;
     }
     printf ("Routing Table: \n");
-    for (i = 0; i < 3; i++){
+    for (i = 0; i < 100; i++){
         if (strcmp(routing[i][0], "") == 0) continue;
-        printf ("Path to %02d by %s: %s\n", node, routing[i][0], routing[i][node+1]);
+        printf ("Path to %02d by %02d: %s\n", node, i, routing[i][node+1]);
     }
     printf ("\n");
     return;
@@ -105,4 +108,17 @@ int ValidPath(char *path, char *node) {
     }
     // Valid path
     return 1; 
+}
+
+// Quando um nó é removido a tabela na sua coluna é eliminada
+void removeAdj (Encaminhamento *e, char* node){
+    int i, n_node = atoi(node);
+
+    for (i = 0; i < 101; i++){
+        strcpy (e->routing[i][n_node], ""); 
+    }
+    strcpy (e->shorter_path[n_node], "");
+    strcpy (e->fowarding[n_node], "");
+
+    return;
 }

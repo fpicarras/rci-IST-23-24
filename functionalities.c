@@ -211,12 +211,13 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
     }
 }
 
-void handleSuccDisconnect(Nodes *n, Select *s){
+void handleSuccDisconnect(Nodes *n, Select *s, Encaminhamento* e){
     char buffer[BUFFER_SIZE];
     Socket *new;
-
+    removeAdj (e, n->succID);
     removeFD(s, getFD_Socket(n->succSOCK)); closeSocket(n->succSOCK, 1);
     n->succSOCK = NULL;
+    
     if(strcmp(n->selfID, n->ssuccID)!=0){
         new = TCPSocket(n->ssuccIP, n->ssuccTCP);
         strcpy(n->succID, n->ssuccID); strcpy(n->succIP, n->ssuccIP); strcpy(n->succTCP, n->ssuccTCP);
@@ -232,7 +233,8 @@ void handleSuccDisconnect(Nodes *n, Select *s){
     }
 }
 
-void handlePredDisconnect(Nodes *n, Select *s){
+void handlePredDisconnect(Nodes *n, Select *s, Encaminhamento* e){
+    removeAdj (e, n->predID);
     removeFD(s, getFD_Socket(n->predSOCK)); closeSocket(n->predSOCK, 1);
     n->predSOCK = NULL;
 }
@@ -285,9 +287,9 @@ void handleNewConnection(Nodes *n, Select *s, Socket *new, char *msg){
 }
 
 int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
-    char str[256], command[8], arg1[8], arg2[16], arg3[16], arg4[16], message[128], buffer[256];
-    int offset = 0;
-    static int connected = 0;
+    char str[256], command[8], arg1[8], arg2[16], arg3[16], arg4[16], message[128], buffer[256], path_buffer[128];
+    int offset = 0, i;
+    static int connected = 0, n_node = 0;
     static char ring[] = "---";
 
     if(fgets(str, 100, stdin) == NULL) return 0;
@@ -304,7 +306,8 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
                 strcpy(n->selfID, arg2); strcpy(ring, arg1);
                 if(join(regSERV, n, s, ring)){
                     if(registerInServer(regSERV, ring, n)) connected = 1;
-                } 
+                }
+
             } else printf("Invalid interface command!\n");
         }
         // DIRECT JOIN [id] [succid] [succIP] [succTCP]

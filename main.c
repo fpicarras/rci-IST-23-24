@@ -43,10 +43,10 @@ int main(int argc, char *argv[]){
     while(1){
         if(!listenSelect(s, -1)) printf("Timed out!\n");
         else{
-//Keyboard Input
+            //Keyboard Input
             if(checkFD(s, 0)) 
                 if(consoleInput(regSERV, n, s, e)) break;
-//Handle a new connection
+            //Handle a new connection
             if(checkFD(s, getFD_Socket(listenTCP))){
                 new = TCPserverAccept(listenTCP);
                 if(new != NULL){
@@ -56,11 +56,11 @@ int main(int argc, char *argv[]){
                     handleNewConnection(n, s, new, buffer);
                 }
             }
-//Succesor sent something
+            //Succesor sent something
             if((n->succSOCK != NULL) && checkFD(s, getFD_Socket(n->succSOCK))){
                 if(Recieve(n->succSOCK, buffer)==0){
                     //Succ disconnected
-                    handleSuccDisconnect(n, s);
+                    handleSuccDisconnect(n, s, e);
                 }else {
                     //Handle remaining commands from succ
                     printf("[succ]: %s\n", buffer);
@@ -68,23 +68,24 @@ int main(int argc, char *argv[]){
                     handleSuccCommands(n, s, buffer);
                 }
             }
-//Predecesor sent something
+            //Predecesor sent something
             if((n->predSOCK != NULL) && checkFD(s, getFD_Socket(n->predSOCK))){
                 if(Recieve(n->predSOCK, buffer)==0){
                     //Pred disconnected
-                    handlePredDisconnect(n, s);
+                    handlePredDisconnect(n, s, e);
                 }else {
                     //Handle remaining commands from pred
                     printf("[pred]: %s\n", buffer);
                     if (sscanf(buffer, "%s", protocol) == 1){
                         if (strcmp(protocol, "CHAT") == 0){
-                            if (sscanf(buffer + 5, "%s %s %[^\n]\n", origin, dest, message) != 3) exit(0);
-                            if (strcmp (dest, n->selfID) == 0){
-                                printf ("%s \n\n", message);
-                                continue;
+                            if (sscanf(buffer + 5, "%s %s %[^\n]\n", origin, dest, message) == 3){
+                                if (strcmp (dest, n->selfID) == 0){
+                                    printf ("%s \n\n", message);
+                                    continue;
+                                }
+                                sprintf(buffer, "CHAT %s %s %s\n", n->succID, dest, message);
+                                Send(n->succSOCK, buffer);  /* Alterar para seguir para o nó da tabela de expedição no indice do destino !!! */
                             }
-                            sprintf(buffer, "CHAT %s %s %s\n", n->succID, dest, message);
-                            Send(n->succSOCK, buffer);  /* Alterar para seguir para o nó da tabela de expedição no indice do destino !!! */
                         }
                     }
                     //handlePredCommands(n, s, buffer);
