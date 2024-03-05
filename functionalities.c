@@ -286,6 +286,20 @@ void handleNewConnection(Nodes *n, Select *s, Socket *new, char *msg){
     }
 }
 
+//Validates if s only has numbers and '.', example:
+//Valid:   192.168.0.144
+//Invalid: 192-169.ab .b
+//Returns 1 if valid, 0 otherwise
+int validateInput(char *s){
+    if(s == NULL) return 0;
+    for(int sz = strlen(s), i = 0; i < sz; i++){
+        if(s[i] > '9' || s[i] < '0'){
+            if(s[i]!='.') return 0;
+        }
+    }
+    return 1;
+}
+
 int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
     char str[256], command[8], arg1[8], arg2[16], arg3[16], arg4[16], message[128], buffer[256], path_buffer[128];
     int offset = 0, i;
