@@ -1,3 +1,4 @@
+#include "fowarding.h" 
 #include "sockets.h"
 #include "select.h"
 
@@ -64,8 +65,9 @@ void handleSuccCommands(Nodes *n, Select *s, char *msg);
  * 
  * @param n Nodes struct with our neighbours information.
  * @param s Select struct with the file descriptors to listen to.
+ * @param e 
  */
-void handleSuccDisconnect(Nodes *n, Select *s);
+void handleSuccDisconnect(Nodes *n, Select *s, Encaminhamento *e);
 
 /**
  * @brief Function to handle commands from the pred.
@@ -81,8 +83,9 @@ void handlePredCommands(Nodes *n, Select *s, char *msg);
  * 
  * @param n Nodes struct with our neighbours information.
  * @param s Select struct with the file descriptors to listen to.
+ * @param e
  */
-void handlePredDisconnect(Nodes *n, Select *s);
+void handlePredDisconnect(Nodes *n, Select *s, Encaminhamento *e);
 
 
 /**
@@ -93,6 +96,6 @@ void handlePredDisconnect(Nodes *n, Select *s);
  * @param s Select struct with the file descriptors to be read when using the select() command.
  * @return int 1 if the program can end, 0 otherwise.
  */
-int consoleInput(Socket *regSERV, Nodes *n, Select *s);
+int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento*);
 
 #endif

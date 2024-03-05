@@ -1,5 +1,5 @@
 NAME = COR
-FILES = sockets.c select.c functionalities.c
+FILES = sockets.c select.c functionalities.c fowarding.c
 CFLAGS = -Wall -O3 -g
 
 all:

@@ -2,12 +2,14 @@
 #include "select.h"
 #include "functionalities.h"
 
+
 #define REGIP "193.136.138.142"
 #define REGUDP "59000"
 
 int main(int argc, char *argv[]){
     char IP[16], TCP[6], buffer[BUFFER_SIZE];
     char regIP[16] = REGIP, regUDP[6] = REGUDP;
+    char protocol[8], message[128], dest[4], origin[4];
     
     //Validamos os argumentos
     if(validateArguments(argc, argv, IP, TCP, regIP, regUDP)) return 0;
@@ -32,6 +34,8 @@ int main(int argc, char *argv[]){
     //Adicionar o porto de escuta
     addFD(s, getFD_Socket(listenTCP));  
 
+    Encaminhamento *e = initEncaminhamento();
+
     /**
      * @brief Neste loop estaremos a ouvir os descritores, para este exemplo, apenas stdin e o porto de esctuta TCP.
      * Quando algum deles se acusar, a funç~ao listenSelect desbloqueia e tratamos desse respetivo fd.
@@ -39,10 +43,10 @@ int main(int argc, char *argv[]){
     while(1){
         if(!listenSelect(s, -1)) printf("Timed out!\n");
         else{
-//Keyboard Input
+            //Keyboard Input
             if(checkFD(s, 0)) 
-                if(consoleInput(regSERV, n, s)) break;
-//Handle a new connection
+                if(consoleInput(regSERV, n, s, e)) break;
+            //Handle a new connection
             if(checkFD(s, getFD_Socket(listenTCP))){
                 new = TCPserverAccept(listenTCP);
                 if(new != NULL){
@@ -52,25 +56,38 @@ int main(int argc, char *argv[]){
                     handleNewConnection(n, s, new, buffer);
                 }
             }
-//Succesor sent something
+            //Succesor sent something
             if((n->succSOCK != NULL) && checkFD(s, getFD_Socket(n->succSOCK))){
                 if(Recieve(n->succSOCK, buffer)==0){
                     //Succ disconnected
-                    handleSuccDisconnect(n, s);
+                    handleSuccDisconnect(n, s, e);
                 }else {
                     //Handle remaining commands from succ
                     printf("[succ]: %s\n", buffer);
+                    //printf ("%d", n);
                     handleSuccCommands(n, s, buffer);
                 }
             }
-//Predecesor sent something
+            //Predecesor sent something
             if((n->predSOCK != NULL) && checkFD(s, getFD_Socket(n->predSOCK))){
                 if(Recieve(n->predSOCK, buffer)==0){
                     //Pred disconnected
-                    handlePredDisconnect(n, s);
+                    handlePredDisconnect(n, s, e);
                 }else {
                     //Handle remaining commands from pred
                     printf("[pred]: %s\n", buffer);
+                    if (sscanf(buffer, "%s", protocol) == 1){
+                        if (strcmp(protocol, "CHAT") == 0){
+                            if (sscanf(buffer + 5, "%s %s %[^\n]\n", origin, dest, message) == 3){
+                                if (strcmp (dest, n->selfID) == 0){
+                                    printf ("%s \n\n", message);
+                                    continue;
+                                }
+                                sprintf(buffer, "CHAT %s %s %s\n", n->succID, dest, message);
+                                Send(n->succSOCK, buffer);  /* Alterar para seguir para o nó da tabela de expedição no indice do destino !!! */
+                            }
+                        }
+                    }
                     //handlePredCommands(n, s, buffer);
                 }
             }
@@ -82,6 +99,7 @@ int main(int argc, char *argv[]){
     removeFD(s, 0);
     removeFD(s, getFD_Socket(listenTCP));
     closeSocket(regSERV, 1); closeSocket(listenTCP, 1);
+    deleteEncaminhamento(e);
     freeSelect(s);
     free(n);
 

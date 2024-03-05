@@ -211,12 +211,13 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
     }
 }
 
-void handleSuccDisconnect(Nodes *n, Select *s){
+void handleSuccDisconnect(Nodes *n, Select *s, Encaminhamento* e){
     char buffer[BUFFER_SIZE];
     Socket *new;
-
+    removeAdj (e, n->succID);
     removeFD(s, getFD_Socket(n->succSOCK)); closeSocket(n->succSOCK, 1);
     n->succSOCK = NULL;
+    
     if(strcmp(n->selfID, n->ssuccID)!=0){
         new = TCPSocket(n->ssuccIP, n->ssuccTCP);
         strcpy(n->succID, n->ssuccID); strcpy(n->succIP, n->ssuccIP); strcpy(n->succTCP, n->ssuccTCP);
@@ -232,14 +233,15 @@ void handleSuccDisconnect(Nodes *n, Select *s){
     }
 }
 
-void handlePredDisconnect(Nodes *n, Select *s){
+void handlePredDisconnect(Nodes *n, Select *s, Encaminhamento* e){
+    removeAdj (e, n->predID);
     removeFD(s, getFD_Socket(n->predSOCK)); closeSocket(n->predSOCK, 1);
     n->predSOCK = NULL;
 }
 
 void handleSuccCommands(Nodes *n, Select *s, char *msg){
     char auxID[4], auxIP[16], auxTCP[8], buffer[BUFFER_SIZE], command[16];
-    Socket *new;
+    Socket *new = NULL;
 
     if(sscanf(msg, "%s", command)){
         if(strcmp(command, "ENTRY")==0){
@@ -298,15 +300,15 @@ int validateInput(char *s){
     return 1;
 }
 
-int consoleInput(Socket *regSERV, Nodes *n, Select *s){
-    char str[100], command[8], arg1[5], arg2[16], arg3[16], arg4[16], message[128];
-    int offset = 0;
-    static int connected = 0;
+int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
+    char str[256], command[8], arg1[8], arg2[16], arg3[16], arg4[16], message[128], buffer[256], path_buffer[128];
+    int offset = 0, i;
+    static int connected = 0, n_node = 0;
     static char ring[] = "---";
 
-    if(fgets(str, 100, stdin)==NULL) return 0;
+    if(fgets(str, 100, stdin) == NULL) return 0;
 
-    if (sscanf(str + offset, "%s", command) == 1) {
+    if (sscanf(str, "%s", command) == 1) {
         offset += strlen(command) + 1; /* +1 para o espaço em branco */
         // JOIN [ring] [id]
         if (strcmp(command, "j") == 0) {
@@ -318,7 +320,8 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                 strcpy(n->selfID, arg2); strcpy(ring, arg1);
                 if(join(regSERV, n, s, ring)){
                     if(registerInServer(regSERV, ring, n)) connected = 1;
-                } 
+                }
+
             } else printf("Invalid interface command!\n");
         }
         // DIRECT JOIN [id] [succid] [succIP] [succTCP]
@@ -333,12 +336,16 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
             } else printf("Invalid interface command!\n");
         }
         // CHORD
-        else if (strcmp(command, "c") == 0) {          
-            /****/             
+        else if (strcmp(command, "c") == 0) {                     
+            if(connected){      
+                /****/   
+            } else printf("Not connected...\n\n");
         }
         // REMOVE CHORD
         else if (strcmp(command, "rc") == 0) {          
-            /****/             
+            if(connected){      
+                /****/   
+            } else printf("Not connected...\n\n");            
         }
         // SHOW TOPOLOGY
         else if (strcmp(command, "st") == 0) {
@@ -352,29 +359,39 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
         }
         // SHOW ROUTING [dest]
         else if (strcmp(command, "sr") == 0) {
-            if (sscanf(str + offset, "%s", arg1) == 1){
-                /****/
-            } else printf("Invalid interface command!\n");
+            if(connected){
+                if (sscanf(str + offset, "%s", arg1) == 1){
+                    ShowRouting (atoi(arg1), e->routing);
+                } else printf("Invalid interface command!\n");
+            } else printf("Not connected...\n\n");
         }
         // SHOW PATH [dest]
         else if (strcmp(command, "sp") == 0) {
-            if (sscanf(str + offset, "%s", arg1) == 1){
-                /****/
-            } else printf("Invalid interface command!\n");
+            if(connected){
+                if (sscanf(str + offset, "%s", arg1) == 1){
+                    ShowPath (atoi(arg1), e->shorter_path);
+                } else printf("Invalid interface command!\n");
+            } else printf("Not connected...\n\n");  
         }
         // SHOW FORWARDING
         else if (strcmp(command, "sf") == 0) {          
-            /****/             
+            if(connected){      
+                ShowFowarding (e->fowarding); 
+            } else printf("Not connected...\n\n"); 
         }
         // MESSAGE [dest] [message]
         else if (strcmp(command, "m") == 0) {
-            offset += strlen(arg1) + 1;
-            if (sscanf(str + offset, "%s", arg1) == 1){
-                if (sscanf(str + offset + 5, "%[^\n]", message) == 1){
-                printf ("%s", message);
-                    /****/
-                }
-            } else printf("Invalid interface command!\n");
+            if(connected){ 
+                if (sscanf(str + 2, "%s", arg1) == 1){
+                    if (sscanf(str + 5, "%[^\n]", message) != 1) exit (0);
+                    if (strcmp (arg1, n->selfID) == 0) printf ("%s\n\n", message);
+                    else {
+                        sprintf(buffer, "CHAT %s %s %s\n", n->selfID, arg1, message);
+                        Send(n->succSOCK, buffer);  /* Alterar para seguir para o nó da tabela de expedição no indice do destino !!! */
+                    } 
+                    
+                } else printf("Invalid interface command!\n");
+            } else printf("Not connected...\n\n"); 
         }
         // LEAVE
         else if (strcmp(command, "l") == 0) {     
@@ -389,7 +406,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                     n->predSOCK = NULL; n->succSOCK = NULL;
                 }
                 connected = 0;
-            }             
+            } else printf("Not connected...\n\n");            
         }
         // EXIT
         else if (strcmp(command, "x") == 0) {          
