@@ -7,6 +7,8 @@
 
 #define TIME_OUT 15
 
+static volatile int loop = 1;
+
 typedef struct _nodes{
     char selfID[3];
     char selfIP[16];
@@ -25,6 +27,8 @@ typedef struct _nodes{
     char predID[3];
     Socket *predSOCK;
 }Nodes;
+
+void sigHandler(int sig);
 
 /**
  * @brief Validates the lauch arguments that the user inserted, the user is free to use regIP and regUDP or not.
@@ -67,7 +71,7 @@ void handleSuccCommands(Nodes *n, Select *s, char *msg);
  * @param s Select struct with the file descriptors to listen to.
  * @param e 
  */
-void handleSuccDisconnect(Nodes *n, Select *s, Encaminhamento *e);
+void handleSuccDisconnect(Nodes *n, Select *s);
 
 /**
  * @brief Function to handle commands from the pred.
@@ -85,7 +89,7 @@ void handlePredCommands(Nodes *n, Select *s, char *msg);
  * @param s Select struct with the file descriptors to listen to.
  * @param e
  */
-void handlePredDisconnect(Nodes *n, Select *s, Encaminhamento *e);
+void handlePredDisconnect(Nodes *n, Select *s);
 
 
 /**
@@ -96,6 +100,6 @@ void handlePredDisconnect(Nodes *n, Select *s, Encaminhamento *e);
  * @param s Select struct with the file descriptors to be read when using the select() command.
  * @return int 1 if the program can end, 0 otherwise.
  */
-int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento*);
+int consoleInput(Socket *regSERV, Nodes *n, Select *s);
 
 #endif

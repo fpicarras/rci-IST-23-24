@@ -1,5 +1,12 @@
 #include "functionalities.h"
 
+Encaminhamento *e = NULL;
+
+void sigHandler(int sig){
+    printf("\nCTRL+C detected -> Closing program and Sockets\n");
+    loop = 0;
+}
+
 int validateArguments(int argc, char **argv, char *IP, char *TCP, char *regIP, char *regUDP){
     if(argc != 3 && argc != 5){
         printf("Invalid Arguments!\nUsage: COR IP TCP [regIP] [regUDP]\n");
@@ -84,6 +91,22 @@ void isNodeInServer(char *nodeslist, char *selfID){
     return;
 }
 
+void sendAllPaths(Socket *s, char *self){
+    char buffer[BUFFER_SIZE];
+
+    for(int i = 0; i < 100; i++){
+        if(e->shorter_path[i][0] != '\0'){
+            sprintf(buffer, "ROUTE %d %d %s\n", atoi(self), i, e->shorter_path[i]);
+            Send(s, buffer);
+        }
+    }
+}
+
+void broadcast(Nodes *n, char *msg){
+    if(n->succSOCK != NULL) Send(n->succSOCK, msg);
+    if(n->predSOCK != NULL && (strcmp(n->succID, n->predID)!=0)) Send(n->predSOCK, msg);
+}
+
 int directJoin(Nodes *n, Select *sel, char *succID, char *succIP, char *succTCP){
     char *buffer = (char*)malloc(BUFFER_SIZE*sizeof(char));
     //printf("Attempting to join to: %s %s:%s\n", succID, succIP, succTCP);
@@ -144,6 +167,12 @@ int directJoin(Nodes *n, Select *sel, char *succID, char *succIP, char *succTCP)
         return 0;
     }
     printf("\nJoined!\nSUCC: %s [%s:%s]\nSSUCC: %s [%s:%s]\nPRED: %s\n\n", n->succID, n->succIP, n->succTCP, n->ssuccID, n->ssuccIP, n->ssuccTCP, n->predID);
+    
+    //Send to our new neighbour our paths
+    sendAllPaths(n->predSOCK, n->selfID);
+    //Send to our new neighbour our paths
+    if(strcmp(n->succID, n->predID) != 0) sendAllPaths(n->succSOCK, n->selfID);
+    //printf("here\n"); fflush(stdin);
     free(buffer);
     freeSelect(s);
     return 1;
@@ -168,6 +197,38 @@ int join(Socket *regSERV, Nodes *n, Select *sel, char *ring){
         return directJoin(n, sel, succID, succIP, succTCP);
     }
 
+}
+
+void handleROUTE(Nodes *n, char *msg){
+    char dest[4], origin[4], path[128], buffer[BUFFER_SIZE];
+
+    if(sscanf(msg, "ROUTE %s %s %s\n", origin, dest, path) == 3){ //ROUTE 30 15 30-20-16-15<LF>
+        if(addPath(e, n->selfID, origin, dest, path)){
+            sprintf(buffer, "ROUTE %s %s %s\n", n->selfID, dest, e->shorter_path[atoi(dest)]);
+            broadcast(n, buffer);
+        }
+    }else if(sscanf(msg, "ROUTE %s %s\n", origin, dest)==2){//ROUTE 30 15<LF>
+        if(addPath(e, n->selfID, origin, dest, NULL)){
+            if(strcmp(e->shorter_path[atoi(dest)], "")==0){
+                sprintf(buffer, "ROUTE %s %s\n", n->selfID, dest);
+            }else sprintf(buffer, "ROUTE %s %s %s\n", n->selfID, dest, e->shorter_path[atoi(dest)]);
+            //broadcast(n, buffer);
+        }
+    }
+}
+
+void messageHANDLER(Nodes *n, char *msg){
+    char origin[4], dest[4] = "", message[128];
+    int n_dest = atoi(dest);
+
+    sscanf(msg, "CHAT %s %s %[^\n]\n", origin, dest, message);
+    n_dest = atoi(dest);
+    if(strcmp(dest, n->selfID) == 0){
+        printf("[%s]: %s\n", origin, message);
+    }else {
+        if(atoi(e->fowarding[n_dest])==atoi(n->predID)) Send(n->predSOCK, msg);
+        else if(atoi(e->fowarding[n_dest])==atoi(n->succID)) Send(n->succSOCK, msg);
+    }
 }
 
 void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
@@ -196,6 +257,9 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
         Send(n->succSOCK, buffer);
         strcpy(n->succID, newID); strcpy(n->succIP, newIP); strcpy(n->succTCP, newTCP);
         addFD(s, getFD_Socket(n->succSOCK));
+
+        //Send to our new neighbour our paths
+        sendAllPaths(n->succSOCK, n->selfID);
     }else{
         sprintf(buffer, "ENTRY %s %s %s\n", newID, newIP, newTCP);
         Send(n->predSOCK, buffer);
@@ -204,20 +268,48 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
         //p(self) = new
         //Removes the fd of pred from current select
         removeFD(s, getFD_Socket(n->predSOCK));
-        closeSocket(n->predSOCK, 0);
+        closeSocket(n->predSOCK, 0); n->predSOCK = NULL;
+
+        
+        //If we are more than 2 in the ring
+        if(strcmp(n->predID, n->succID)!=0){
+            printf("%d\n", __LINE__);
+            int *aux = removeAdj(e, n->predID);
+            for(int i = 0; aux != NULL && aux[i] != -1; i++){
+                if(strcmp(e->shorter_path[aux[i]], "")==0){
+                    sprintf(buffer, "ROUTE %s %d\n", n->selfID, aux[i]);
+                }else sprintf(buffer, "ROUTE %s %d %s\n", n->selfID, aux[i], e->shorter_path[aux[i]]);
+                broadcast(n, buffer);
+            }
+        }
+        
+
+
         strcpy(n->predID, newID); n->predSOCK = new_node;
         //Adds the new fd to the select
         addFD(s, getFD_Socket(n->predSOCK));
+
+        //Send to our new neighbour our paths
+        sendAllPaths(n->predSOCK, n->selfID);
     }
 }
 
-void handleSuccDisconnect(Nodes *n, Select *s, Encaminhamento* e){
+void handleSuccDisconnect(Nodes *n, Select *s){
+    int *aux;
     char buffer[BUFFER_SIZE];
     Socket *new;
-    removeAdj (e, n->succID);
     removeFD(s, getFD_Socket(n->succSOCK)); closeSocket(n->succSOCK, 1);
     n->succSOCK = NULL;
-    
+
+    printf("%d\n", __LINE__);
+    aux = removeAdj (e, n->succID);
+    for(int i = 0; aux != NULL && aux[i] != -1; i++){
+        if(strcmp(e->shorter_path[aux[i]], "")==0){
+            sprintf(buffer, "ROUTE %s %d\n", n->selfID, aux[i]);
+        }else sprintf(buffer, "ROUTE %s %d %s\n", n->selfID, aux[i], e->shorter_path[aux[i]]);
+        broadcast(n, buffer);
+    }
+
     if(strcmp(n->selfID, n->ssuccID)!=0){
         new = TCPSocket(n->ssuccIP, n->ssuccTCP);
         strcpy(n->succID, n->ssuccID); strcpy(n->succIP, n->ssuccIP); strcpy(n->succTCP, n->ssuccTCP);
@@ -227,19 +319,38 @@ void handleSuccDisconnect(Nodes *n, Select *s, Encaminhamento* e){
 
         sprintf(buffer, "SUCC %s %s %s", n->succID, n->succIP, n->succTCP);
         Send(n->predSOCK, buffer);
+
+        //Send to our new neighbour our paths
+        sendAllPaths(n->succSOCK, n->selfID);
     }else {//In case we are the only node left, we dont connect to ourself...
         strcpy(n->succID, n->ssuccID); strcpy(n->succIP, n->ssuccIP); strcpy(n->succTCP, n->ssuccTCP);
         strcpy(n->predID, n->ssuccID);
     }
 }
 
-void handlePredDisconnect(Nodes *n, Select *s, Encaminhamento* e){
-    removeAdj (e, n->predID);
+void handlePredDisconnect(Nodes *n, Select *s){
+    int *aux;
+    char buffer[BUFFER_SIZE];
+
     removeFD(s, getFD_Socket(n->predSOCK)); closeSocket(n->predSOCK, 1);
     n->predSOCK = NULL;
+
+    
+    if(strcmp(n->predID, n->succID)!=0){
+        printf("%d\n", __LINE__);
+        aux = removeAdj (e, n->predID);
+        for(int i = 0; aux != NULL && aux[i] != -1; i++){
+            if(strcmp(e->shorter_path[aux[i]], "")==0){
+                sprintf(buffer, "ROUTE %s %d\n", n->selfID, aux[i]);
+            }else sprintf(buffer, "ROUTE %s %d %s\n", n->selfID, aux[i], e->shorter_path[aux[i]]);
+            broadcast(n, buffer);
+        }
+    }
+    
 }
 
 void handleSuccCommands(Nodes *n, Select *s, char *msg){
+    int *aux;
     char auxID[4], auxIP[16], auxTCP[8], buffer[BUFFER_SIZE], command[16];
     Socket *new = NULL;
 
@@ -254,7 +365,21 @@ void handleSuccCommands(Nodes *n, Select *s, char *msg){
             //demote succ to ssucc and closes connection
             strcpy(n->ssuccID, n->succID); strcpy(n->ssuccIP, n->succIP); strcpy(n->ssuccTCP, n->succTCP);
             removeFD(s, getFD_Socket(n->succSOCK));
-            closeSocket(n->succSOCK, 1);
+            closeSocket(n->succSOCK, 1); n->succSOCK = NULL;
+
+            
+            //If we are more than 2 in the ring
+            if(strcmp(n->predID, n->succID)!=0){
+                printf("%d\n", __LINE__);
+                aux = removeAdj(e, n->succID);
+                for(int i = 0; aux != NULL && aux[i] != -1; i++){
+                    if(strcmp(e->shorter_path[aux[i]], "")==0){
+                        sprintf(buffer, "ROUTE %s %d\n", n->selfID, aux[i]);
+                    }else sprintf(buffer, "ROUTE %s %d %s\n", n->selfID, aux[i], e->shorter_path[aux[i]]);
+                    broadcast(n, buffer);
+                }
+            }
+            
 
             //Set new node to succ
             strcpy(n->succID, auxID); strcpy(n->succIP, auxIP); strcpy(n->succTCP, auxTCP);
@@ -262,14 +387,29 @@ void handleSuccCommands(Nodes *n, Select *s, char *msg){
             new = TCPSocket(auxIP, auxTCP);
             addFD(s, getFD_Socket(new)); n->succSOCK = new;
             Send(new, buffer);
+
+            //Send to our new neighbour our paths
+            sendAllPaths(n->succSOCK, n->selfID);
         }else if(strcmp(command, "SUCC")==0){
             sscanf(msg, "SUCC %s %s %s\n", n->ssuccID, n->ssuccIP, n->ssuccTCP);
+        }else if(strcmp(command, "ROUTE")==0){
+            handleROUTE(n, msg);
+        }else if(strcmp(command, "CHAT")==0){
+            messageHANDLER(n, msg);
         }
     }
 }
 
 void handlePredCommands(Nodes *n, Select *s, char *msg){
-    /**/
+    char protocol[8];
+
+    if (sscanf(msg, "%s", protocol) == 1){
+        if(strcmp(protocol, "ROUTE") == 0){
+            handleROUTE(n, msg);
+        }else if(strcmp(protocol, "CHAT")==0){
+            messageHANDLER(n, msg);
+        }
+    }
 }
 
 void handleNewConnection(Nodes *n, Select *s, Socket *new, char *msg){
@@ -280,6 +420,10 @@ void handleNewConnection(Nodes *n, Select *s, Socket *new, char *msg){
         if(strcmp(command, "PRED")==0){
             sscanf(msg, "PRED %s\n", n->predID);
             n->predSOCK = new; addFD(s, getFD_Socket(new));
+
+            //Send to our new neighbour our paths
+            sendAllPaths(n->predSOCK, n->selfID);
+
             sprintf(buffer, "SUCC %s %s %s\n", n->succID, n->succIP, n->succTCP);
             Send(new, buffer);
         }
@@ -300,10 +444,10 @@ int validateInput(char *s){
     return 1;
 }
 
-int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
-    char str[256], command[8], arg1[8], arg2[16], arg3[16], arg4[16], message[128], buffer[256], path_buffer[128];
-    int offset = 0, i;
-    static int connected = 0, n_node = 0;
+int consoleInput(Socket *regSERV, Nodes *n, Select *s){
+    char str[256], command[8], arg1[8], arg2[16], arg3[16], arg4[16], message[128], buffer[256];
+    int offset = 0;
+    static int connected = 0;
     static char ring[] = "---";
 
     if(fgets(str, 100, stdin) == NULL) return 0;
@@ -318,6 +462,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
             }
             if (sscanf(str + offset, "%s %s", arg1, arg2) == 2){
                 strcpy(n->selfID, arg2); strcpy(ring, arg1);
+                e = initEncaminhamento(n->selfID);
                 if(join(regSERV, n, s, ring)){
                     if(registerInServer(regSERV, ring, n)) connected = 1;
                 }
@@ -332,7 +477,10 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
             }
             if (sscanf(str + offset, "%s %s %s %s", arg1, arg2, arg3, arg4) == 4){
                 strcpy(n->selfID, arg1);
-                if(directJoin(n, s, arg2, arg3, arg4)) connected = 1;
+                e = initEncaminhamento(n->selfID);
+                if(directJoin(n, s, arg2, arg3, arg4)){
+                    connected = 1;
+                }
             } else printf("Invalid interface command!\n");
         }
         // CHORD
@@ -383,11 +531,11 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
         else if (strcmp(command, "m") == 0) {
             if(connected){ 
                 if (sscanf(str + 2, "%s", arg1) == 1){
-                    if (sscanf(str + 5, "%[^\n]", message) != 1) exit (0);
+                    if (sscanf(str + 5, "%[^\n]", message) != 1) exit (0);                  /* EXIT 0 ??? tas maluco*/
                     if (strcmp (arg1, n->selfID) == 0) printf ("%s\n\n", message);
                     else {
                         sprintf(buffer, "CHAT %s %s %s\n", n->selfID, arg1, message);
-                        Send(n->succSOCK, buffer);  /* Alterar para seguir para o nó da tabela de expedição no indice do destino !!! */
+                        messageHANDLER(n, buffer);
                     } 
                     
                 } else printf("Invalid interface command!\n");
@@ -405,6 +553,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
                     closeSocket(n->predSOCK, 1); closeSocket(n->succSOCK, 1);
                     n->predSOCK = NULL; n->succSOCK = NULL;
                 }
+                deleteEncaminhamento(e);
                 connected = 0;
             } else printf("Not connected...\n\n");            
         }
@@ -418,7 +567,9 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s, Encaminhamento *e){
                 }
                 if(n->predSOCK != NULL && n->succSOCK != NULL){
                     closeSocket(n->predSOCK, 1); closeSocket(n->succSOCK, 1);
+                    n->predSOCK = NULL; n->succSOCK = NULL;
                 }
+                deleteEncaminhamento(e);
                 connected = 0;
             }
             return 1;             

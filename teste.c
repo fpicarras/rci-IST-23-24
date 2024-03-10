@@ -1,62 +1,37 @@
 #include "sockets.h"
 #include <stdio.h>
-
-#define TESTE "NODESLIST 001\n01 127.5.0.123 12345\n17 0.0.0.0 12345\n96 127.0.0.1 54321\n"
-
-int isNodeInServer(char *nodeslist, char *selfID){
-    //Skip NODESLIST r\n
-    char *aux;
-    char succID[4], succIP[16], succTCP[8];
-
-    char id[4]; strcpy(id, selfID);
-
-    int available, i=0;
-    while(1){
-        aux = nodeslist+14;
-        available = 1;
-        while(sscanf(aux, "%s %s %s", succID, succIP, succTCP)==3){
-            if(strcmp(id, succID)==0){
-                available = 0;
-                i = (id[0]-48)*10 + (id[1]-48);
-                i++;
-                id[0] = (i%100 - i%10)/10 + 48;
-                id[1] = (i%10) + 48;
-                break;
-            }
-            aux += 3+strlen(succID)+strlen(succIP)+strlen(succTCP);
-        }
-        if(available) break;
-    }
-    printf("Id choosen: %s\n", id);
-    return 1;
-}
+#include "fowarding.h"
 
 int main(){
-    char buffer[1024];
-    int i = 0;
-    char IP[16], TCP[6], ID[3];
-    printf("%d\n", isNodeInServer(TESTE, "96"));
+    Encaminhamento *e = initEncaminhamento("30");
 
-    /*
-    Socket *new = TCPserverSocket("8123", 15);
-    Socket *conn, *pred;
-    if(new == NULL) return 1;
+    ShowFowarding(e->fowarding);
 
-    while(i < 10){
-        conn = TCPserverAccept(new);
-        Recieve(conn, buffer);
-        sscanf(buffer, "ENTRY %s %s %s", ID, IP, TCP);
-        printf("Node %s [%s:%s] is connecting...\n", ID, IP, TCP);
-        
-        Send(conn, "SUCC 17 192.168.0.17 1234");
-        pred = TCPSocket(IP, TCP);
-        Send(pred, "PRED 80\n");
+    addPath(e, "30", "8", "8", "8");
+    addPath(e, "30", "12", "8", "12-8");
+    addPath(e, "30", "15", "8", "15-21-10");
 
-        closeSocket(conn); closeSocket(pred);
-        i++;
-    }
-    
-    closeSocket(new);
-    */
+    addPath(e, "30", "8", "10", "8-10");
+    addPath(e, "30", "12", "10", "12-8-10");
+    addPath(e, "30", "15", "10", "15-21-10");
+
+    addPath(e, "30", "8", "12", "8-12");
+    addPath(e, "30", "12", "12", "12");
+
+    addPath(e, "30", "15", "15", "15");
+
+    addPath(e, "30", "8", "21", "8-10-21");
+    addPath(e, "30", "12", "21", "12-8-10-21");
+    addPath(e, "30", "15", "21", "15-21");
+
+    ShowFowarding(e->fowarding);
+    ShowPath(21, e->shorter_path);
+
+    int *aux = removeAdj(e, "15");
+    for(int i = 0; aux != NULL && aux[i] != -1; i++) printf("Atualizado: %d\n", aux[i]);
+    ShowPath(21, e->shorter_path);
+    ShowPath(15, e->shorter_path);
+
+    deleteEncaminhamento(e);
     return 0;
 }

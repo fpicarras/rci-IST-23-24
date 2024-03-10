@@ -11,7 +11,7 @@ typedef struct _encaminhamento
     char **fowarding;
 } Encaminhamento;
 
-Encaminhamento *initEncaminhamento ();
+Encaminhamento *initEncaminhamento (char*);
 
 void deleteEncaminhamento (Encaminhamento*);
 
@@ -22,5 +22,9 @@ void ShowPath (int, char**);
 void ShowRouting (int, char***);
 
 int ValidPath(char*, char*);
+
+int addPath(Encaminhamento *e, char *self, char *origin, char *dest, char *path);
+
+int *removeAdj (Encaminhamento *e, char* node);
 
 #endif

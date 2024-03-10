@@ -6,7 +6,7 @@ all:
 	gcc -o $(NAME) main.c $(FILES) $(CFLAGS)
 
 teste:
-	gcc -o teste teste.c $(FILES) $(CFLAGS)
+	gcc -o test teste.c $(FILES) $(CFLAGS)
 
 clean:
 	rm -rf teste $(NAME)
