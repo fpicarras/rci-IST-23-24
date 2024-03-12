@@ -212,20 +212,31 @@ void handleROUTE(Nodes *n, char *msg){
             if(strcmp(e->shorter_path[atoi(dest)], "")==0){
                 sprintf(buffer, "ROUTE %s %s\n", n->selfID, dest);
             }else sprintf(buffer, "ROUTE %s %s %s\n", n->selfID, dest, e->shorter_path[atoi(dest)]);
-            //broadcast(n, buffer);
+            broadcast(n, buffer);
         }
     }
 }
 
 void messageHANDLER(Nodes *n, char *msg){
-    char origin[4], dest[4] = "", message[128];
-    int n_dest = atoi(dest);
+    char origin[4], dest[4] = "", message[128], buffer[BUFFER_SIZE];
+    int n_dest;
 
     sscanf(msg, "CHAT %s %s %[^\n]\n", origin, dest, message);
     n_dest = atoi(dest);
-    if(strcmp(dest, n->selfID) == 0){
+    /***
+     * Let's say that the [origin] send a message to [dest] moments before the routing message
+     * arrives saying [dest] left, somewhere in the path this condition will send a message back
+     * reporting that it will never arrive, for this node already left the ring...
+    */
+    if(e->fowarding[n_dest][0] == '\0'){
+        sprintf(message, "Node [%s] is no longer in the ring...", dest);
+        sprintf(buffer, "CHAT %s %s %s\n", n->selfID, origin, message);
+        messageHANDLER(n, buffer);
+    }else if(strcmp(dest, n->selfID) == 0){
+        //We are the destination for the message
         printf("[%s]: %s\n", origin, message);
     }else {
+        //Forward this message
         if(atoi(e->fowarding[n_dest])==atoi(n->predID)) Send(n->predSOCK, msg);
         else if(atoi(e->fowarding[n_dest])==atoi(n->succID)) Send(n->succSOCK, msg);
     }
@@ -273,7 +284,6 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
         
         //If we are more than 2 in the ring
         if(strcmp(n->predID, n->succID)!=0){
-            printf("%d\n", __LINE__);
             int *aux = removeAdj(e, n->predID);
             for(int i = 0; aux != NULL && aux[i] != -1; i++){
                 if(strcmp(e->shorter_path[aux[i]], "")==0){
@@ -301,7 +311,6 @@ void handleSuccDisconnect(Nodes *n, Select *s){
     removeFD(s, getFD_Socket(n->succSOCK)); closeSocket(n->succSOCK, 1);
     n->succSOCK = NULL;
 
-    printf("%d\n", __LINE__);
     aux = removeAdj (e, n->succID);
     for(int i = 0; aux != NULL && aux[i] != -1; i++){
         if(strcmp(e->shorter_path[aux[i]], "")==0){
@@ -309,6 +318,7 @@ void handleSuccDisconnect(Nodes *n, Select *s){
         }else sprintf(buffer, "ROUTE %s %d %s\n", n->selfID, aux[i], e->shorter_path[aux[i]]);
         broadcast(n, buffer);
     }
+    if(aux != NULL) free(aux);
 
     if(strcmp(n->selfID, n->ssuccID)!=0){
         new = TCPSocket(n->ssuccIP, n->ssuccTCP);
@@ -337,7 +347,6 @@ void handlePredDisconnect(Nodes *n, Select *s){
 
     
     if(strcmp(n->predID, n->succID)!=0){
-        printf("%d\n", __LINE__);
         aux = removeAdj (e, n->predID);
         for(int i = 0; aux != NULL && aux[i] != -1; i++){
             if(strcmp(e->shorter_path[aux[i]], "")==0){
@@ -345,6 +354,7 @@ void handlePredDisconnect(Nodes *n, Select *s){
             }else sprintf(buffer, "ROUTE %s %d %s\n", n->selfID, aux[i], e->shorter_path[aux[i]]);
             broadcast(n, buffer);
         }
+        if(aux != NULL) free(aux);
     }
     
 }
@@ -370,7 +380,6 @@ void handleSuccCommands(Nodes *n, Select *s, char *msg){
             
             //If we are more than 2 in the ring
             if(strcmp(n->predID, n->succID)!=0){
-                printf("%d\n", __LINE__);
                 aux = removeAdj(e, n->succID);
                 for(int i = 0; aux != NULL && aux[i] != -1; i++){
                     if(strcmp(e->shorter_path[aux[i]], "")==0){
@@ -509,7 +518,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
         else if (strcmp(command, "sr") == 0) {
             if(connected){
                 if (sscanf(str + offset, "%s", arg1) == 1){
-                    ShowRouting (atoi(arg1), e->routing);
+                    ShowRouting (e, atoi(arg1));
                 } else printf("Invalid interface command!\n");
             } else printf("Not connected...\n\n");
         }
@@ -517,14 +526,14 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
         else if (strcmp(command, "sp") == 0) {
             if(connected){
                 if (sscanf(str + offset, "%s", arg1) == 1){
-                    ShowPath (atoi(arg1), e->shorter_path);
+                    ShowPath (e, atoi(arg1));
                 } else printf("Invalid interface command!\n");
             } else printf("Not connected...\n\n");  
         }
         // SHOW FORWARDING
         else if (strcmp(command, "sf") == 0) {          
             if(connected){      
-                ShowFowarding (e->fowarding); 
+                ShowFowarding (e); 
             } else printf("Not connected...\n\n"); 
         }
         // MESSAGE [dest] [message]

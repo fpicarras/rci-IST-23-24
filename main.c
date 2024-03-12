@@ -5,6 +5,9 @@
 #define REGIP "193.136.138.142"
 #define REGUDP "59000"
 
+//Set to 1 to see the messages recieved, 0 not to
+#define VERBOSE 0
+
 int main(int argc, char *argv[]){
     char IP[16], TCP[6], buffer[BUFFER_SIZE];
     char regIP[16] = REGIP, regUDP[6] = REGUDP;
@@ -50,7 +53,7 @@ int main(int argc, char *argv[]){
                 if(new != NULL){
                     Recieve(new, buffer);
                     //Get message content
-                    printf("[TCP listen]: %s\n", buffer);
+                    if(VERBOSE) printf("[TCP listen]: %s\n", buffer);
                     handleNewConnection(n, s, new, buffer);
                 }
             }
@@ -61,7 +64,7 @@ int main(int argc, char *argv[]){
                     handleSuccDisconnect(n, s);
                 }else {
                     //Handle remaining commands from succ
-                    printf("[succ]: %s\n", buffer);
+                    if(VERBOSE) printf("[succ]: %s\n", buffer);
                     //printf ("%d", n);
                     handleSuccCommands(n, s, buffer);
                 }
@@ -73,7 +76,7 @@ int main(int argc, char *argv[]){
                     handlePredDisconnect(n, s);
                 }else {
                     //Handle remaining commands from pred
-                    printf("[pred]: %s\n", buffer);
+                    if(VERBOSE) printf("[pred]: %s\n", buffer);
                     handlePredCommands(n, s, buffer);
                 }
             }
