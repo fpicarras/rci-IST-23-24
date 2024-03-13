@@ -32,6 +32,7 @@ int main(int argc, char *argv[]){
     Socket *regSERV = UDPSocket(regIP, regUDP);
     
     Socket *new = NULL;
+    Chord *chord_head = NULL, *c_aux;
 
     n->selfSOCK = listenTCP;
     //Adicionar o porto de escuta
@@ -42,6 +43,8 @@ int main(int argc, char *argv[]){
      * Quando algum deles se acusar, a funç~ao listenSelect desbloqueia e tratamos desse respetivo fd.
      */
     while(loop){
+        c_aux = chord_head;
+
         if(!listenSelect(s, -1)) printf("Timed out!\n");
         else{
             //Keyboard Input
@@ -54,7 +57,7 @@ int main(int argc, char *argv[]){
                     Recieve(new, buffer);
                     //Get message content
                     if(VERBOSE) printf("[TCP listen]: %s\n", buffer);
-                    handleNewConnection(n, s, new, buffer);
+                    handleNewConnection(n, s, &chord_head, new, buffer);
                 }
             }
             //Succesor sent something
@@ -79,6 +82,28 @@ int main(int argc, char *argv[]){
                     if(VERBOSE) printf("[pred]: %s\n", buffer);
                     handlePredCommands(n, s, buffer);
                 }
+            }
+            //Our Chord sent something
+            if((n->c != NULL) && checkFD(s, getFD_Socket(n->c->s))){
+                if(Recieve(n->c->s, buffer)==0){
+                    /* Handles disconnec */
+                }else {
+                    if(VERBOSE) printf("[c-%s]: %s\n", n->c->ID, buffer);
+                    /* Handle Commands */
+                }
+            }
+            //Iterate over all ramaining chords
+            while(c_aux != NULL){
+                //Some other chord sent something
+                if(checkFD(s, getFD_Socket(c_aux->s))){
+                    if(Recieve(n->c->s, buffer)==0){
+                        /* Handles disconnec */
+                    }else {
+                        if(VERBOSE) printf("[c-%s]: %s\n", n->c->ID, buffer);
+                        /* Handle Commands */
+                    }
+                }
+                c_aux = c_aux->next;
             }
         }
         

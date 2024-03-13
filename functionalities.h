@@ -9,6 +9,12 @@
 
 static volatile int loop = 1;
 
+typedef struct _chords_struct{
+    Socket *s;
+    char ID[4];
+    struct _chord_struct *next;
+}Chord;
+
 typedef struct _nodes{
     char selfID[3];
     char selfIP[16];
@@ -26,6 +32,9 @@ typedef struct _nodes{
 
     char predID[3];
     Socket *predSOCK;
+
+    Chord *c;
+
 }Nodes;
 
 void sigHandler(int sig);
@@ -53,7 +62,7 @@ int validateArguments(int argc, char **argv, char *IP, char *TCP, char *regIP, c
  * @param new Socket* with the new connection.
  * @param msg String with the message sent from the new connection.
  */
-void handleNewConnection(Nodes *n, Select *s, Socket *new, char *msg);
+void handleNewConnection(Nodes *n, Select *s, Chord **c_head, Socket *new, char *msg);
 
 /**
  * @brief Function to handle commands from the succ.

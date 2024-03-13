@@ -107,6 +107,42 @@ void broadcast(Nodes *n, char *msg){
     if(n->predSOCK != NULL && (strcmp(n->succID, n->predID)!=0)) Send(n->predSOCK, msg);
 }
 
+Chord *deleteChord(Chord *head, char *ID){
+    Chord *aux1, *aux2;
+
+    if(head == NULL) return NULL;
+    aux1 = head;
+    while(aux1 != NULL){
+        if(strcmp(aux1->ID, ID)==0){
+            if(aux1 == head){
+                closeSocket(aux1->s, 1);
+                aux2 = aux1->next;
+                free(aux1);
+                return aux2;
+            }else {
+                aux2->next = aux1->next;
+                closeSocket(aux1->s, 0);
+                free(aux1);
+                return head;
+            }
+        }
+        aux2 = aux1;
+    }
+
+    return head;
+}
+
+void deleteChords(Chord *head){
+    Chord *aux = head, *aux2;
+
+    while(aux != NULL){
+        aux2 = aux->next;
+        closeSocket(aux->s, 1);
+        free(aux);
+        aux = aux2;
+    }
+}
+
 int directJoin(Nodes *n, Select *sel, char *succID, char *succIP, char *succTCP){
     char *buffer = (char*)malloc(BUFFER_SIZE*sizeof(char));
     //printf("Attempting to join to: %s %s:%s\n", succID, succIP, succTCP);
@@ -421,8 +457,9 @@ void handlePredCommands(Nodes *n, Select *s, char *msg){
     }
 }
 
-void handleNewConnection(Nodes *n, Select *s, Socket *new, char *msg){
+void handleNewConnection(Nodes *n, Select *s, Chord **c_head, Socket *new, char *msg){
     char buffer[BUFFER_SIZE], command[16];
+    Chord *new_c = NULL;
 
     if(sscanf(msg, "%s", command)){
         if(strcmp(command, "ENTRY")==0) handleENTRY(n, new, s, msg);
@@ -435,6 +472,17 @@ void handleNewConnection(Nodes *n, Select *s, Socket *new, char *msg){
 
             sprintf(buffer, "SUCC %s %s %s\n", n->succID, n->succIP, n->succTCP);
             Send(new, buffer);
+        }
+        if(strcmp(command, "CHORD")==0){
+            new_c = (Chord*)calloc(1, sizeof(Chord));
+            sscanf(msg, "CHORD %s\n", new_c->ID);
+            new_c->s = new; addFD(s, getFD_Socket(new));
+
+            new_c->next = *c_head;
+            *c_head = new_c;
+
+            //Send to our new neighbour our paths
+            sendAllPaths(new, n->selfID);
         }
     }
 }
