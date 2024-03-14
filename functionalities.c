@@ -132,7 +132,7 @@ Chord *deleteChord(Chord *head, char *ID){
     return head;
 }
 
-void deleteChords(Chord *head){
+void deleteALLChords(Chord *head){
     Chord *aux = head, *aux2;
 
     while(aux != NULL){
@@ -240,14 +240,14 @@ void handleROUTE(Nodes *n, char *msg){
 
     if(sscanf(msg, "ROUTE %s %s %s\n", origin, dest, path) == 3){ //ROUTE 30 15 30-20-16-15<LF>
         if(addPath(e, n->selfID, origin, dest, path)){
-            sprintf(buffer, "ROUTE %s %s %s\n", n->selfID, dest, e->shorter_path[atoi(dest)]);
+            sprintf(buffer, "ROUTE %d %d %s\n", atoi(n->selfID), atoi(dest), e->shorter_path[atoi(dest)]);
             broadcast(n, buffer);
         }
     }else if(sscanf(msg, "ROUTE %s %s\n", origin, dest)==2){//ROUTE 30 15<LF>
         if(addPath(e, n->selfID, origin, dest, NULL)){
             if(strcmp(e->shorter_path[atoi(dest)], "")==0){
-                sprintf(buffer, "ROUTE %s %s\n", n->selfID, dest);
-            }else sprintf(buffer, "ROUTE %s %s %s\n", n->selfID, dest, e->shorter_path[atoi(dest)]);
+                sprintf(buffer, "ROUTE %d %d\n", atoi(n->selfID), atoi(dest));
+            }else sprintf(buffer, "ROUTE %d %d %s\n", atoi(n->selfID), atoi(dest), e->shorter_path[atoi(dest)]);
             broadcast(n, buffer);
         }
     }
@@ -279,6 +279,7 @@ void messageHANDLER(Nodes *n, char *msg){
 }
 
 void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
+    int *aux = NULL;
     char buffer[64], newID[4], newIP[16], newTCP[8];
 
     sscanf(msg, "ENTRY %s %s %s\n", newID, newIP, newTCP);
@@ -320,13 +321,14 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
         
         //If we are more than 2 in the ring
         if(strcmp(n->predID, n->succID)!=0){
-            int *aux = removeAdj(e, n->predID);
+            aux = removeAdj(e, n->predID);
             for(int i = 0; aux != NULL && aux[i] != -1; i++){
                 if(strcmp(e->shorter_path[aux[i]], "")==0){
-                    sprintf(buffer, "ROUTE %s %d\n", n->selfID, aux[i]);
-                }else sprintf(buffer, "ROUTE %s %d %s\n", n->selfID, aux[i], e->shorter_path[aux[i]]);
+                    sprintf(buffer, "ROUTE %d %d\n", atoi(n->selfID), aux[i]);
+                }else sprintf(buffer, "ROUTE %d %d %s\n", atoi(n->selfID), aux[i], e->shorter_path[aux[i]]);
                 broadcast(n, buffer);
             }
+            if(aux != NULL) free(aux);
         }
         
 
@@ -350,8 +352,8 @@ void handleSuccDisconnect(Nodes *n, Select *s){
     aux = removeAdj (e, n->succID);
     for(int i = 0; aux != NULL && aux[i] != -1; i++){
         if(strcmp(e->shorter_path[aux[i]], "")==0){
-            sprintf(buffer, "ROUTE %s %d\n", n->selfID, aux[i]);
-        }else sprintf(buffer, "ROUTE %s %d %s\n", n->selfID, aux[i], e->shorter_path[aux[i]]);
+            sprintf(buffer, "ROUTE %d %d\n", atoi(n->selfID), aux[i]);
+        }else sprintf(buffer, "ROUTE %d %d %s\n", atoi(n->selfID), aux[i], e->shorter_path[aux[i]]);
         broadcast(n, buffer);
     }
     if(aux != NULL) free(aux);
@@ -363,7 +365,7 @@ void handleSuccDisconnect(Nodes *n, Select *s){
         sprintf(buffer, "PRED %s\n", n->selfID);
         Send(new, buffer);
 
-        sprintf(buffer, "SUCC %s %s %s", n->succID, n->succIP, n->succTCP);
+        sprintf(buffer, "SUCC %s %s %s\n", n->succID, n->succIP, n->succTCP);
         Send(n->predSOCK, buffer);
 
         //Send to our new neighbour our paths
@@ -386,8 +388,8 @@ void handlePredDisconnect(Nodes *n, Select *s){
         aux = removeAdj (e, n->predID);
         for(int i = 0; aux != NULL && aux[i] != -1; i++){
             if(strcmp(e->shorter_path[aux[i]], "")==0){
-                sprintf(buffer, "ROUTE %s %d\n", n->selfID, aux[i]);
-            }else sprintf(buffer, "ROUTE %s %d %s\n", n->selfID, aux[i], e->shorter_path[aux[i]]);
+                sprintf(buffer, "ROUTE %d %d\n", atoi(n->selfID), aux[i]);
+            }else sprintf(buffer, "ROUTE %d %d %s\n", atoi(n->selfID), aux[i], e->shorter_path[aux[i]]);
             broadcast(n, buffer);
         }
         if(aux != NULL) free(aux);
@@ -419,10 +421,11 @@ void handleSuccCommands(Nodes *n, Select *s, char *msg){
                 aux = removeAdj(e, n->succID);
                 for(int i = 0; aux != NULL && aux[i] != -1; i++){
                     if(strcmp(e->shorter_path[aux[i]], "")==0){
-                        sprintf(buffer, "ROUTE %s %d\n", n->selfID, aux[i]);
-                    }else sprintf(buffer, "ROUTE %s %d %s\n", n->selfID, aux[i], e->shorter_path[aux[i]]);
+                        sprintf(buffer, "ROUTE %d %d\n", atoi(n->selfID), aux[i]);
+                    }else sprintf(buffer, "ROUTE %d %d %s\n", atoi(n->selfID), aux[i], e->shorter_path[aux[i]]);
                     broadcast(n, buffer);
                 }
+                if(aux != NULL) free(aux);
             }
             
 

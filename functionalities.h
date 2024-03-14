@@ -12,7 +12,7 @@ static volatile int loop = 1;
 typedef struct _chords_struct{
     Socket *s;
     char ID[4];
-    struct _chord_struct *next;
+    struct _chords_struct *next;
 }Chord;
 
 typedef struct _nodes{

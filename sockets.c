@@ -132,7 +132,7 @@ int Send(Socket *sock, char *message){
         }
     }else if(sock->type == 1){
         //Is TCP
-        int nleft = BUFFER_SIZE, nwritten;
+        int nleft = strlen(message), nwritten;
         ptr = buffer;
         while(nleft>0){
             nwritten = write(sock->fd, ptr, nleft);
@@ -174,13 +174,12 @@ int Recieve(Socket *sock, char *buffer){
     }else if(sock->type == 1){
         //Is TCP
         char *ptr = buffer;
-        int nleft = BUFFER_SIZE, nread;
-        while(nleft > 0){
-            nread = read(sock->fd, ptr, nleft);
-            if(nread <= 0) break;
-            nleft -= nread;
+        int nread = 0;
+        while((nread = read(sock->fd, ptr, 1))>0){
+            if(ptr[0]=='\n') break;
             ptr += nread;
         }
+        ptr[1] = '\0';
         return nread;
     }
     return -1;
