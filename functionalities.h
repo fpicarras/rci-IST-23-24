@@ -33,6 +33,11 @@ typedef struct _nodes{
     char predID[3];
     Socket *predSOCK;
 
+    char chordID[3];
+    char chordIP[16];
+    char chordTCP[6];
+    Socket *chordSOCK;
+
     Chord *c;
 
 }Nodes;
@@ -100,6 +105,13 @@ void handlePredCommands(Nodes *n, Select *s, char *msg);
  */
 void handlePredDisconnect(Nodes *n, Select *s);
 
+void handleChordsCommands(Nodes *n, Select *s, char *msg);
+
+void handleChordsDisconnect(Nodes *n, Select *s, Chord* c);
+
+void handleOurChordDisconnect(Nodes *n, Select *s);
+
+Chord *deleteChord(Chord *head, char *ID);
 
 /**
  * @brief Function to handle the inputs from stdin.

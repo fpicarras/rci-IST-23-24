@@ -103,8 +103,13 @@ void sendAllPaths(Socket *s, char *self){
 }
 
 void broadcast(Nodes *n, char *msg){
+    Chord *aux = n->c;
     if(n->succSOCK != NULL) Send(n->succSOCK, msg);
     if(n->predSOCK != NULL && (strcmp(n->succID, n->predID)!=0)) Send(n->predSOCK, msg);
+    if(n->chordSOCK != NULL) Send(n->chordSOCK, msg);
+    /*while (aux != NULL){
+        if (aux->s != NULL) Send(aux->s, msg);
+    }*/
 }
 
 Chord *deleteChord(Chord *head, char *ID){
@@ -128,7 +133,6 @@ Chord *deleteChord(Chord *head, char *ID){
         }
         aux2 = aux1;
     }
-
     return head;
 }
 
@@ -226,6 +230,7 @@ int join(Socket *regSERV, Nodes *n, Select *sel, char *ring){
         strcpy(n->succID, n->selfID); strcpy(n->succIP, n->selfIP); strcpy(n->succTCP, n->selfTCP);
         strcpy(n->ssuccID, n->selfID); strcpy(n->ssuccIP, n->selfIP); strcpy(n->ssuccTCP, n->selfTCP);
         strcpy(n->predID, n->selfID);
+        strcpy (n->chordID, ""); strcpy (n->chordIP, ""); strcpy (n->chordTCP, "");
         free(aux);
         return 1;
     }else{
@@ -256,6 +261,7 @@ void handleROUTE(Nodes *n, char *msg){
 void messageHANDLER(Nodes *n, char *msg){
     char origin[4], dest[4] = "", message[128], buffer[BUFFER_SIZE];
     int n_dest;
+    Chord *c_aux = n->c;
 
     sscanf(msg, "CHAT %s %s %[^\n]\n", origin, dest, message);
     n_dest = atoi(dest);
@@ -275,6 +281,12 @@ void messageHANDLER(Nodes *n, char *msg){
         //Forward this message
         if(atoi(e->fowarding[n_dest])==atoi(n->predID)) Send(n->predSOCK, msg);
         else if(atoi(e->fowarding[n_dest])==atoi(n->succID)) Send(n->succSOCK, msg);
+        else if(atoi(e->fowarding[n_dest])==atoi(n->chordID)) Send(n->chordSOCK, msg);
+        else {
+            while (c_aux != NULL){
+                if (atoi(e->fowarding[n_dest])==atoi(c_aux->ID)) Send(c_aux->s, msg);
+            }
+        }
     }
 }
 
@@ -394,6 +406,41 @@ void handlePredDisconnect(Nodes *n, Select *s){
         }
         if(aux != NULL) free(aux);
     }
+}
+
+void handleOurChordDisconnect(Nodes *n, Select *s){
+    int *aux;
+    char buffer[BUFFER_SIZE];
+    removeFD(s, getFD_Socket(n->chordSOCK)); closeSocket(n->chordSOCK, 1);
+    n->chordSOCK = NULL;
+
+    aux = removeAdj (e, n->chordID);
+    for(int i = 0; aux != NULL && aux[i] != -1; i++){
+        if(strcmp(e->shorter_path[aux[i]], "")==0){
+            sprintf(buffer, "ROUTE %d %d\n", atoi(n->selfID), aux[i]);
+        }else sprintf(buffer, "ROUTE %d %d %s\n", atoi(n->selfID), aux[i], e->shorter_path[aux[i]]);
+        broadcast(n, buffer);
+    }
+    if(aux != NULL) free(aux);
+    strcpy (n->chordID, ""); strcpy (n->chordIP, "");  strcpy (n->chordTCP, ""); 
+}
+
+void handleChordsDisconnect(Nodes *n, Select *s, Chord* c){
+    int *aux;
+    char buffer[BUFFER_SIZE];
+    Chord *aux1 = NULL;
+
+    removeFD(s, getFD_Socket(c->s)); closeSocket(c->s, 1);
+    c->s = NULL;
+
+    aux = removeAdj (e, c->ID);
+    for(int i = 0; aux != NULL && aux[i] != -1; i++){
+        if(strcmp(e->shorter_path[aux[i]], "")==0){
+            sprintf(buffer, "ROUTE %d %d\n", atoi(n->selfID), aux[i]);
+        }else sprintf(buffer, "ROUTE %d %d %s\n", atoi(n->selfID), aux[i], e->shorter_path[aux[i]]);
+        broadcast(n, buffer);
+    }
+    if(aux != NULL) free(aux);
     
 }
 
@@ -428,7 +475,6 @@ void handleSuccCommands(Nodes *n, Select *s, char *msg){
                 if(aux != NULL) free(aux);
             }
             
-
             //Set new node to succ
             strcpy(n->succID, auxID); strcpy(n->succIP, auxIP); strcpy(n->succTCP, auxTCP);
             sprintf(buffer, "PRED %s\n", n->selfID);
@@ -458,6 +504,10 @@ void handlePredCommands(Nodes *n, Select *s, char *msg){
             messageHANDLER(n, msg);
         }
     }
+}
+
+void handleChordsCommands(Nodes *n, Select *s, char *msg){
+    
 }
 
 void handleNewConnection(Nodes *n, Select *s, Chord **c_head, Socket *new, char *msg){
@@ -545,14 +595,48 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
         }
         // CHORD
         else if (strcmp(command, "c") == 0) {                     
-            if(connected){      
-                /****/   
+            if(connected){   
+                if (strcmp (n->predID, n->ssuccID) != 0){ // Há mais de 3 nós
+                    if (strcmp (n->chordID, "") == 0){
+                        char *aux = getNodesServer(regSERV, ring), *aux1;
+                        char ID[4], IP[16], TCP[8], buffer[16];
+                        aux1 = aux + 14;
+                        while(sscanf(aux1, "%s %s %s", ID, IP, TCP)==3){
+                            if (strcmp(ID, n->selfID) != 0 && strcmp(ID, n->succID) != 0 && strcmp(ID, n->predID) != 0){
+                                n->chordSOCK = TCPSocket(IP, TCP);
+                                if(n->chordSOCK == NULL){
+                                    printf("Unable to connec to succesor %s\n", ID);
+                                    return 0;
+                                }
+                                //If connection as succeceful fill n with the succ info -> s(self) = succ
+                                addFD(s, getFD_Socket(n->chordSOCK));
+                                strcpy(n->chordID, ID); strcpy(n->chordIP, IP); strcpy(n->chordTCP, TCP);
+                                //Sending the ENTRY command
+                                sprintf(buffer, "CHORD %s\n", n->selfID);
+                                Send(n->chordSOCK, buffer);
+                                
+                                //Waiting for response!
+                                addFD(s, getFD_Socket(n->chordSOCK));
+                                
+                                sendAllPaths(n->chordSOCK, n->selfID);
+                                sendAllPaths(n->predSOCK, n->selfID);
+                                sendAllPaths(n->succSOCK, n->selfID);
+
+                                break;
+                            }
+                            aux1 += 3+strlen(ID)+strlen(IP)+strlen(TCP);
+                        }
+                        free(aux);
+                    } else printf ("Already in a chord ...");
+                } else printf ("3 nodes in the ring...");
             } else printf("Not connected...\n\n");
         }
         // REMOVE CHORD
         else if (strcmp(command, "rc") == 0) {          
             if(connected){      
-                /****/   
+                if (strcmp (n->chordID, "") != 0){
+                    handleOurChordDisconnect(n, s);                  
+                } else printf("Not connected by chord...\n\n");  
             } else printf("Not connected...\n\n");            
         }
         // SHOW TOPOLOGY
@@ -562,7 +646,8 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                 printf("Pred: %s\n", n->predID);
                 printf("Self: %s [%s:%s]\n", n->selfID, n->selfIP, n->selfTCP);
                 printf("Succ: %s [%s:%s]\n", n->succID, n->succIP, n->succTCP);
-                printf("Ssucc: %s [%s:%s]\n\n", n->ssuccID, n->ssuccIP, n->ssuccTCP); 
+                printf("Ssucc: %s [%s:%s]\n", n->ssuccID, n->ssuccIP, n->ssuccTCP); 
+                printf("Chord: %s [%s:%s]\n\n", n->chordID, n->chordIP, n->chordTCP);
             }else printf("Not connected...\n\n");         
         }
         // SHOW ROUTING [dest]
@@ -591,7 +676,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
         else if (strcmp(command, "m") == 0) {
             if(connected){ 
                 if (sscanf(str + 2, "%s", arg1) == 1){
-                    if (sscanf(str + 5, "%[^\n]", message) != 1) exit (0);                  /* EXIT 0 ??? tas maluco*/
+                    if (sscanf(str + 5, "%[^\n]", message) != 1) return 0;                  /* EXIT 0 ??? tas maluco*/
                     if (strcmp (arg1, n->selfID) == 0) printf ("%s\n\n", message);
                     else {
                         sprintf(buffer, "CHAT %s %s %s\n", n->selfID, arg1, message);
