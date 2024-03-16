@@ -43,8 +43,6 @@ int main(int argc, char *argv[]){
      * Quando algum deles se acusar, a funç~ao listenSelect desbloqueia e tratamos desse respetivo fd.
      */
     while(loop){
-        c_aux = n->c;
-
         if(!listenSelect(s, -1)) printf("Timed out!\n");
         else{
             //Keyboard Input
@@ -92,6 +90,7 @@ int main(int argc, char *argv[]){
                     handlePredCommands (n, s, buffer);
                 }
             }
+            c_aux = n->c;
             //Iterate over all ramaining chords
             while(c_aux != NULL){
                 //Some other chord sent something

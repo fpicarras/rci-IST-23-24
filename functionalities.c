@@ -107,9 +107,10 @@ void broadcast(Nodes *n, char *msg){
     if(n->succSOCK != NULL) Send(n->succSOCK, msg);
     if(n->predSOCK != NULL && (strcmp(n->succID, n->predID)!=0)) Send(n->predSOCK, msg);
     if(n->chordSOCK != NULL) Send(n->chordSOCK, msg);
-    /*while (aux != NULL){
-        if (aux->s != NULL) Send(aux->s, msg);
-    }*/
+    while (aux != NULL){
+        Send(aux->s, msg);
+        aux = aux->next;
+    }
 }
 
 Chord *deleteChord(Chord *head, char *ID){
@@ -126,7 +127,7 @@ Chord *deleteChord(Chord *head, char *ID){
                 return aux2;
             }else {
                 aux2->next = aux1->next;
-                closeSocket(aux1->s, 0);
+                closeSocket(aux1->s, 1);
                 free(aux1);
                 return head;
             }
@@ -136,11 +137,12 @@ Chord *deleteChord(Chord *head, char *ID){
     return head;
 }
 
-void deleteALLChords(Chord *head){
+void deleteALLChords(Chord *head, Select *s){
     Chord *aux = head, *aux2;
 
     while(aux != NULL){
         aux2 = aux->next;
+        removeFD(s, getFD_Socket(aux->s));
         closeSocket(aux->s, 1);
         free(aux);
         aux = aux2;
@@ -414,7 +416,7 @@ void handleOurChordDisconnect(Nodes *n, Select *s){
     removeFD(s, getFD_Socket(n->chordSOCK)); closeSocket(n->chordSOCK, 1);
     n->chordSOCK = NULL;
 
-    aux = removeAdj (e, n->chordID);
+    aux = removeAdj(e, n->chordID);
     for(int i = 0; aux != NULL && aux[i] != -1; i++){
         if(strcmp(e->shorter_path[aux[i]], "")==0){
             sprintf(buffer, "ROUTE %d %d\n", atoi(n->selfID), aux[i]);
@@ -428,12 +430,13 @@ void handleOurChordDisconnect(Nodes *n, Select *s){
 void handleChordsDisconnect(Nodes *n, Select *s, Chord* c){
     int *aux;
     char buffer[BUFFER_SIZE];
-    Chord *aux1 = NULL;
 
-    removeFD(s, getFD_Socket(c->s)); closeSocket(c->s, 1);
-    c->s = NULL;
+    removeFD(s, getFD_Socket(c->s));
 
     aux = removeAdj (e, c->ID);
+    
+    n->c = deleteChord(n->c, c->ID);
+
     for(int i = 0; aux != NULL && aux[i] != -1; i++){
         if(strcmp(e->shorter_path[aux[i]], "")==0){
             sprintf(buffer, "ROUTE %d %d\n", atoi(n->selfID), aux[i]);
@@ -474,6 +477,10 @@ void handleSuccCommands(Nodes *n, Select *s, char *msg){
                 }
                 if(aux != NULL) free(aux);
             }
+
+            if(strcmp(n->succID, n->chordID)==0){
+                handleOurChordDisconnect(n, s);
+            }
             
             //Set new node to succ
             strcpy(n->succID, auxID); strcpy(n->succIP, auxIP); strcpy(n->succTCP, auxTCP);
@@ -506,9 +513,9 @@ void handlePredCommands(Nodes *n, Select *s, char *msg){
     }
 }
 
-void handleChordsCommands(Nodes *n, Select *s, char *msg){
+/*void handleChordsCommands(Nodes *n, Select *s, char *msg){
     
-}
+}*/
 
 void handleNewConnection(Nodes *n, Select *s, Chord **c_head, Socket *new, char *msg){
     char buffer[BUFFER_SIZE], command[16];
@@ -518,6 +525,9 @@ void handleNewConnection(Nodes *n, Select *s, Chord **c_head, Socket *new, char 
         if(strcmp(command, "ENTRY")==0) handleENTRY(n, new, s, msg);
         if(strcmp(command, "PRED")==0){
             sscanf(msg, "PRED %s\n", n->predID);
+            if(strcmp(n->predID, n->chordID) == 0){
+                handleOurChordDisconnect(n, s);
+            }
             n->predSOCK = new; addFD(s, getFD_Socket(new));
 
             //Send to our new neighbour our paths
@@ -697,10 +707,17 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                     removeFD(s, getFD_Socket(n->predSOCK)); removeFD(s, getFD_Socket(n->succSOCK));
                     closeSocket(n->predSOCK, 1); closeSocket(n->succSOCK, 1);
                     n->predSOCK = NULL; n->succSOCK = NULL;
-                }
-                deleteEncaminhamento(e);
-                connected = 0;
-            } else printf("Not connected...\n\n");            
+                    if (strcmp (n->chordID, "") != 0){
+                        removeFD(s, getFD_Socket(n->chordSOCK)); closeSocket(n->chordSOCK, 1);
+                        n->chordSOCK = NULL;
+                        strcpy (n->chordID, ""); strcpy (n->chordIP, "");  strcpy (n->chordTCP, "");
+                    }
+                    deleteALLChords(n->c, s);
+                    n->c = NULL;
+                    deleteEncaminhamento(e);
+                    connected = 0;
+                } else printf("Not connected...\n\n");            
+            }
         }
         // EXIT
         else if (strcmp(command, "x") == 0) {          
@@ -713,7 +730,13 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                 if(n->predSOCK != NULL && n->succSOCK != NULL){
                     closeSocket(n->predSOCK, 1); closeSocket(n->succSOCK, 1);
                     n->predSOCK = NULL; n->succSOCK = NULL;
+                    if (strcmp (n->chordID, "") != 0){
+                        removeFD(s, getFD_Socket(n->chordSOCK)); closeSocket(n->chordSOCK, 1);
+                        n->chordSOCK = NULL;
+                    }
                 }
+                deleteALLChords(n->c, s);
+                n->c = NULL;
                 deleteEncaminhamento(e);
                 connected = 0;
             }

@@ -138,8 +138,10 @@ int findSecondShortest(Encaminhamento *e, int node_leaving, int dest){
 /* Adds a path to the tables, returns 1 if the f and sp tables were updated, 0 otherwise*/
 int addPath(Encaminhamento *e, char *self, char *origin, char *dest, char *path){
     int n_origin = atoi(origin), n_dest = atoi(dest), n_self = atoi(self), aux;
+    char old_path[64];
 
     if(path == NULL){
+        //printf("Compare: %s %s\n", e->shorter_path[n_dest], e->routing[n_dest+1][n_origin]);
         if(strcmp(e->shorter_path[n_dest], e->routing[n_dest+1][n_origin])==0){
             strcpy(e->routing[n_dest+1][n_origin], "-");
             if((aux = findSecondShortest(e, n_origin, n_dest))==-1){
@@ -164,6 +166,7 @@ int addPath(Encaminhamento *e, char *self, char *origin, char *dest, char *path)
     if(ValidPath(path, aux_c)){
         e->routing[0][n_origin][0] = '1';
 
+        strcpy(old_path, e->routing[n_dest+1][n_origin]);
         sprintf(e->routing[n_dest+1][n_origin], "%d-%s", n_self, path);
         
         if(e->shorter_path[n_dest][0] == '\0'){ //It is empty
@@ -173,8 +176,15 @@ int addPath(Encaminhamento *e, char *self, char *origin, char *dest, char *path)
             //printf("%s\n", e->shorter_path[n_dest]);
             return 1;
         }else{
+            if(strcmp(old_path, e->shorter_path[n_dest])==0){
+                aux = findSecondShortest(e, n_origin, n_dest);
+                //printf("%s <- %s\n", e->shorter_path[n_dest], e->routing[n_dest+1][aux]);
+                strcpy (e->shorter_path[n_dest], e->routing[n_dest+1][aux]);
+                sprintf(e->fowarding[n_dest], "%d", aux);
+                return 1;
+            }
             //The path there is already the shortest
-            if(pathSize(e->shorter_path[n_dest]) <= pathSize(e->routing[n_dest+1][n_origin])){
+            else if(pathSize(e->shorter_path[n_dest]) <= pathSize(e->routing[n_dest+1][n_origin])){
                 return 0;
             }else { //If we have a new shortest path, we replace the old one
                 //printf("%s <- ", e->shorter_path[n_dest]);
@@ -211,7 +221,7 @@ int addPath(Encaminhamento *e, char *self, char *origin, char *dest, char *path)
 int *removeAdj (Encaminhamento *e, char* node){
     int i, n_node = atoi(node);
     int *updated_paths = (int*)calloc(100, sizeof(int)), n_updated = 0, aux;
-
+    //printf("Removing Adj: %s\n", node);
     for (i = 0; i < 101; i++){
         if(i > 0){
             
@@ -238,8 +248,8 @@ int *removeAdj (Encaminhamento *e, char* node){
         }
 
     }
-    strcpy (e->shorter_path[n_node], "");
-    strcpy (e->fowarding[n_node], "");
+    //strcpy (e->shorter_path[n_node], "");
+    //strcpy (e->fowarding[n_node], "");
 
     if(n_updated > 0){
         updated_paths[n_updated] = -1;

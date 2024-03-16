@@ -105,13 +105,11 @@ void handlePredCommands(Nodes *n, Select *s, char *msg);
  */
 void handlePredDisconnect(Nodes *n, Select *s);
 
-void handleChordsCommands(Nodes *n, Select *s, char *msg);
+//void handleChordsCommands(Nodes *n, Select *s, char *msg);
 
 void handleChordsDisconnect(Nodes *n, Select *s, Chord* c);
 
 void handleOurChordDisconnect(Nodes *n, Select *s);
-
-Chord *deleteChord(Chord *head, char *ID);
 
 /**
  * @brief Function to handle the inputs from stdin.
