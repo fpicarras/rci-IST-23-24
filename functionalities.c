@@ -108,24 +108,23 @@ void broadcast(Nodes *n, char *msg){
     if(n->predSOCK != NULL && (strcmp(n->succID, n->predID)!=0)) Send(n->predSOCK, msg);
     if(n->chordSOCK != NULL) Send(n->chordSOCK, msg);
     while (aux != NULL){
-        Send(aux->s, msg);
+        if(aux->s != NULL) Send(aux->s, msg);
         aux = aux->next;
     }
 }
 
 Chord *deleteChord(Chord *head, char *ID){
-    Chord *aux1, *aux2;
+    Chord *aux1 = head, *aux2 = head;
 
     if(head == NULL) return NULL;
-    aux1 = head;
     while(aux1 != NULL){
         if(strcmp(aux1->ID, ID)==0){
             if(aux1 == head){
-                closeSocket(aux1->s, 1);
                 aux2 = aux1->next;
+                closeSocket(aux1->s, 1);
                 free(aux1);
                 return aux2;
-            }else {
+            } else {
                 aux2->next = aux1->next;
                 closeSocket(aux1->s, 1);
                 free(aux1);
@@ -133,12 +132,13 @@ Chord *deleteChord(Chord *head, char *ID){
             }
         }
         aux2 = aux1;
+        aux1 = aux1->next;
     }
     return head;
 }
 
 void deleteALLChords(Chord *head, Select *s){
-    Chord *aux = head, *aux2;
+    Chord *aux = head, *aux2 = NULL;
 
     while(aux != NULL){
         aux2 = aux->next;
@@ -434,7 +434,7 @@ void handleChordsDisconnect(Nodes *n, Select *s, Chord* c){
     removeFD(s, getFD_Socket(c->s));
 
     aux = removeAdj (e, c->ID);
-    
+
     n->c = deleteChord(n->c, c->ID);
 
     for(int i = 0; aux != NULL && aux[i] != -1; i++){
@@ -570,6 +570,9 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
     static int connected = 0;
     static char ring[] = "---";
 
+    int flag = 0;    // Meter numa função em conjuto com o if das cordas
+    Chord *ch = NULL; // Meter numa função em conjuto com o if das cordas
+
     if(fgets(str, 100, stdin) == NULL) return 0;
 
     if (sscanf(str, "%s", command) == 1) {
@@ -613,26 +616,37 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                         aux1 = aux + 14;
                         while(sscanf(aux1, "%s %s %s", ID, IP, TCP)==3){
                             if (strcmp(ID, n->selfID) != 0 && strcmp(ID, n->succID) != 0 && strcmp(ID, n->predID) != 0){
-                                n->chordSOCK = TCPSocket(IP, TCP);
-                                if(n->chordSOCK == NULL){
-                                    printf("Unable to connec to succesor %s\n", ID);
-                                    return 0;
+                                ch = n->c;
+                                flag = 0;
+                                while (ch != NULL){
+                                    if (strcmp (ch->ID, ID) == 0){
+                                        flag = 1;
+                                        break;
+                                    }
+                                    ch = ch->next;
                                 }
-                                //If connection as succeceful fill n with the succ info -> s(self) = succ
-                                addFD(s, getFD_Socket(n->chordSOCK));
-                                strcpy(n->chordID, ID); strcpy(n->chordIP, IP); strcpy(n->chordTCP, TCP);
-                                //Sending the ENTRY command
-                                sprintf(buffer, "CHORD %s\n", n->selfID);
-                                Send(n->chordSOCK, buffer);
-                                
-                                //Waiting for response!
-                                addFD(s, getFD_Socket(n->chordSOCK));
-                                
-                                sendAllPaths(n->chordSOCK, n->selfID);
-                                sendAllPaths(n->predSOCK, n->selfID);
-                                sendAllPaths(n->succSOCK, n->selfID);
+                                if (flag == 0){
+                                    n->chordSOCK = TCPSocket(IP, TCP);
+                                    if(n->chordSOCK == NULL){
+                                        printf("Unable to connec to succesor %s\n", ID);
+                                        return 0;
+                                    }
+                                    //If connection as succeceful fill n with the succ info -> s(self) = succ
+                                    addFD(s, getFD_Socket(n->chordSOCK));
+                                    strcpy(n->chordID, ID); strcpy(n->chordIP, IP); strcpy(n->chordTCP, TCP);
+                                    //Sending the ENTRY command
+                                    sprintf(buffer, "CHORD %s\n", n->selfID);
+                                    Send(n->chordSOCK, buffer);
+                                    
+                                    //Waiting for response!
+                                    addFD(s, getFD_Socket(n->chordSOCK));
+                                    
+                                    sendAllPaths(n->chordSOCK, n->selfID);
+                                    sendAllPaths(n->predSOCK, n->selfID);
+                                    sendAllPaths(n->succSOCK, n->selfID);
 
-                                break;
+                                    break;
+                                }
                             }
                             aux1 += 3+strlen(ID)+strlen(IP)+strlen(TCP);
                         }
