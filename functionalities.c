@@ -729,8 +729,9 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                     deleteALLChords(n->c, s);
                     n->c = NULL;
                     deleteEncaminhamento(e);
-                    connected = 0;
+                    
                 } else printf("Not connected...\n\n");            
+                connected = 0;
             }
         }
         // EXIT
@@ -742,6 +743,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                     strcpy(ring, "---");
                 }
                 if(n->predSOCK != NULL && n->succSOCK != NULL){
+                    removeFD(s, getFD_Socket(n->predSOCK)); removeFD(s, getFD_Socket(n->succSOCK));
                     closeSocket(n->predSOCK, 1); closeSocket(n->succSOCK, 1);
                     n->predSOCK = NULL; n->succSOCK = NULL;
                     if (strcmp (n->chordID, "") != 0){
