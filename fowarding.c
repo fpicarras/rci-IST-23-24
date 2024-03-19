@@ -1,7 +1,7 @@
 #include "fowarding.h"
 
 Encaminhamento *initEncaminhamento (char *self){
-    int i, j;
+    int i, j, n_self = atoi(self);
     Encaminhamento *new = NULL;
     
     new = (Encaminhamento*) calloc (1, sizeof(Encaminhamento));
@@ -21,8 +21,9 @@ Encaminhamento *initEncaminhamento (char *self){
     new->fowarding = (char**) calloc (100, sizeof(char*));
     for (i = 0; i < 100; i++) new->fowarding[i] = (char*) calloc (4, sizeof(char));
 
-    sprintf(new->shorter_path[atoi(self)], "%d", atoi(self));
-    sprintf(new->fowarding[atoi(self)], "%d", atoi(self));
+    sprintf(new->shorter_path[n_self], "%d", n_self);
+    sprintf(new->fowarding[n_self], "%d", n_self);
+    new->routing[0][n_self][0] = '1';
 
     return new;
 }

@@ -21,11 +21,24 @@ int validateArguments(int argc, char **argv, char *IP, char *TCP, char *regIP, c
 }
 
 int registerInServer(Socket *server, char *ring, Nodes *n){
+    int attempts = 0;
     char buffer[128];
+    Select *udp_t = newSelect();
+    addFD(udp_t, getFD_Socket(server));
 
     sprintf(buffer, "REG %s %s %s %s", ring, n->selfID, n->selfIP, n->selfTCP);
     Send(server, buffer);
-    Recieve(server, buffer);
+    while(attempts < UDP_ATTEMPTS){
+        if(listenSelect(udp_t, UDP_TIME_OUT)>0){
+            Recieve(server, buffer);
+            break;
+        }
+        else {
+            printf("Server unresponsive... Retrying (%d/%d)\n", (attempts++)+1, UDP_ATTEMPTS);
+            Send(server, buffer);
+        }
+    }
+    freeSelect(udp_t);
 
     if(strcmp(buffer, "OKREG")==0){
         printf("Registred as %s in ring %s!\n\n", n->selfID, ring);
@@ -37,12 +50,24 @@ int registerInServer(Socket *server, char *ring, Nodes *n){
 }
 
 int unregisterInServer(Socket *server, char *ring, Nodes *n){
+    int attempts = 0;
     char buffer[64];
+    Select *udp_t = newSelect();
+    addFD(udp_t, getFD_Socket(server));
 
     sprintf(buffer, "UNREG %s %s", ring, n->selfID);
     Send(server, buffer);
-    Recieve(server, buffer);
-
+    while(attempts < UDP_ATTEMPTS){
+        if(listenSelect(udp_t, UDP_TIME_OUT)>0){
+            Recieve(server, buffer);
+            break;
+        }
+        else {
+            printf("Server unresponsive... Retrying (%d/%d)\n", (attempts++)+1, UDP_ATTEMPTS);
+            Send(server, buffer);
+        }
+    }
+    freeSelect(udp_t);
     if(strcmp(buffer, "OKUNREG")==0){
         printf("Leaving ring %s...\n\n", ring);
         return 1;
@@ -54,11 +79,28 @@ int unregisterInServer(Socket *server, char *ring, Nodes *n){
 
 char *getNodesServer(Socket *server, char *ring){
     char *buffer =(char*)malloc(sizeof(char)*BUFFER_SIZE);
+    int attempts = 0;
+
+    Select *udp_t = newSelect();
+    addFD(udp_t, getFD_Socket(server));
 
     sprintf(buffer, "NODES %s", ring);
     Send(server, buffer);
-    Recieve(server, buffer);
-
+    while(attempts < UDP_ATTEMPTS){
+        if(listenSelect(udp_t, UDP_TIME_OUT)>0){
+            Recieve(server, buffer);
+            break;
+        }
+        else {
+            printf("Server unresponsive... Retrying (%d/%d)\n", (attempts++)+1, UDP_ATTEMPTS);
+            Send(server, buffer);
+        }
+    }
+    freeSelect(udp_t);
+    if(attempts == UDP_ATTEMPTS){
+        free(buffer);
+        return NULL;
+    }
     return buffer;
 }
 
@@ -149,6 +191,56 @@ void deleteALLChords(Chord *head, Select *s){
     }
 }
 
+void createCHORD(Nodes *n, Select *s, Socket *server, char *ring, char *target){
+    char ID[4], IP[16], TCP[8], buffer[16];
+    char *aux = NULL, *aux1 = NULL;
+
+    if (strcmp (n->predID, n->ssuccID) != 0){ // Há mais de 3 nós
+        if (strcmp (n->chordID, "") == 0){
+            aux = getNodesServer(server, ring);
+            if (aux == NULL){
+                printf("Failed to get Nodes from server...\n");
+                free(aux);
+                return;
+            }
+            aux1 = aux + 14;
+            while(sscanf(aux1, "%s %s %s", ID, IP, TCP)==3){
+                if (e->routing[0][atoi(ID)][0] == '\0'){
+                    //If we have a target, we only try to connect to it
+                    if(target != NULL){
+                        if(strcmp(target, ID) != 0){
+                            aux1 += 3+strlen(ID)+strlen(IP)+strlen(TCP);
+                            continue;
+                        }
+                    }
+
+                    n->chordSOCK = TCPSocket(IP, TCP);
+                    if(n->chordSOCK == NULL){
+                        printf("Unable to connec to target node %s\n", ID);
+                        free(aux);
+                        return;
+                    }
+                    //If connection as succeceful fill n with the succ info -> s(self) = succ
+                    addFD(s, getFD_Socket(n->chordSOCK));
+                    strcpy(n->chordID, ID); strcpy(n->chordIP, IP); strcpy(n->chordTCP, TCP);
+                    //Sending the ENTRY command
+                    sprintf(buffer, "CHORD %s\n", n->selfID);
+                    Send(n->chordSOCK, buffer);
+                    
+                    //Waiting for response!
+                    addFD(s, getFD_Socket(n->chordSOCK));
+                    
+                    sendAllPaths(n->chordSOCK, n->selfID);
+
+                    break;
+                }
+                aux1 += 3+strlen(ID)+strlen(IP)+strlen(TCP);
+            }
+            free(aux);
+        } else printf ("Already in a chord ...");
+    } else printf ("3 nodes in the ring...");
+}
+
 int directJoin(Nodes *n, Select *sel, char *succID, char *succIP, char *succTCP){
     char *buffer = (char*)malloc(BUFFER_SIZE*sizeof(char));
     //printf("Attempting to join to: %s %s:%s\n", succID, succIP, succTCP);
@@ -224,6 +316,10 @@ int join(Socket *regSERV, Nodes *n, Select *sel, char *ring){
     char succID[3], succIP[16], succTCP[8];
     //Gets the list of connected Nodes
     char *aux = getNodesServer(regSERV, ring);
+    if (aux == NULL){
+        printf("Failed to get Nodes from server...\n");
+        return 0;
+    }
     //Ensures that out id is unique, if it isn't we try to get a new one
     isNodeInServer(aux, n->selfID);
     //Skip NODESLIST r\n
@@ -287,6 +383,7 @@ void messageHANDLER(Nodes *n, char *msg){
         else {
             while (c_aux != NULL){
                 if (atoi(e->fowarding[n_dest])==atoi(c_aux->ID)) Send(c_aux->s, msg);
+                c_aux = c_aux->next; //Isto da merda (acho eu)                                  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
             }
         }
     }
@@ -570,9 +667,6 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
     static int connected = 0;
     static char ring[] = "---";
 
-    int flag = 0;    // Meter numa função em conjuto com o if das cordas
-    Chord *ch = NULL; // Meter numa função em conjuto com o if das cordas
-
     if(fgets(str, 100, stdin) == NULL) return 0;
 
     if (sscanf(str, "%s", command) == 1) {
@@ -609,50 +703,8 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
         // CHORD
         else if (strcmp(command, "c") == 0) {                     
             if(connected){   
-                if (strcmp (n->predID, n->ssuccID) != 0){ // Há mais de 3 nós
-                    if (strcmp (n->chordID, "") == 0){
-                        char *aux = getNodesServer(regSERV, ring), *aux1;
-                        char ID[4], IP[16], TCP[8], buffer[16];
-                        aux1 = aux + 14;
-                        while(sscanf(aux1, "%s %s %s", ID, IP, TCP)==3){
-                            if (strcmp(ID, n->selfID) != 0 && strcmp(ID, n->succID) != 0 && strcmp(ID, n->predID) != 0){
-                                ch = n->c;
-                                flag = 0;
-                                while (ch != NULL){
-                                    if (strcmp (ch->ID, ID) == 0){
-                                        flag = 1;
-                                        break;
-                                    }
-                                    ch = ch->next;
-                                }
-                                if (flag == 0){
-                                    n->chordSOCK = TCPSocket(IP, TCP);
-                                    if(n->chordSOCK == NULL){
-                                        printf("Unable to connec to succesor %s\n", ID);
-                                        return 0;
-                                    }
-                                    //If connection as succeceful fill n with the succ info -> s(self) = succ
-                                    addFD(s, getFD_Socket(n->chordSOCK));
-                                    strcpy(n->chordID, ID); strcpy(n->chordIP, IP); strcpy(n->chordTCP, TCP);
-                                    //Sending the ENTRY command
-                                    sprintf(buffer, "CHORD %s\n", n->selfID);
-                                    Send(n->chordSOCK, buffer);
-                                    
-                                    //Waiting for response!
-                                    addFD(s, getFD_Socket(n->chordSOCK));
-                                    
-                                    sendAllPaths(n->chordSOCK, n->selfID);
-                                    sendAllPaths(n->predSOCK, n->selfID);
-                                    sendAllPaths(n->succSOCK, n->selfID);
-
-                                    break;
-                                }
-                            }
-                            aux1 += 3+strlen(ID)+strlen(IP)+strlen(TCP);
-                        }
-                        free(aux);
-                    } else printf ("Already in a chord ...");
-                } else printf ("3 nodes in the ring...");
+                if(sscanf(str, "c %s", arg1)==1) createCHORD(n, s, regSERV, ring, arg1);
+                else createCHORD(n, s, regSERV, ring, NULL);
             } else printf("Not connected...\n\n");
         }
         // REMOVE CHORD
@@ -760,21 +812,32 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
         }
         else if(strcmp(command, "clear") == 0){
             if(sscanf(str+6, "%s", arg1)){
-                char *aux = getNodesServer(regSERV, arg1), *aux1;
-                char ID[4], IP[16], TCP[8], buffer[32];
-                aux1 = aux + 14;
-                while(sscanf(aux1, "%s %s %s", ID, IP, TCP)==3){
-                    sprintf(buffer, "UNREG %s %s", arg1, ID);
-                    Send(regSERV, buffer); Recieve(regSERV, buffer);
-                    printf("%s\n", buffer);
-                    aux1 += 3+strlen(ID)+strlen(IP)+strlen(TCP);
+                int attempts = 0;
+                char buffer[32];
+                Select *udp_t = newSelect();
+                addFD(udp_t, getFD_Socket(regSERV));
+
+                sprintf(buffer, "RST %s", arg1);
+                while(attempts < UDP_ATTEMPTS){
+                    if(listenSelect(udp_t, UDP_TIME_OUT)>0){
+                        Recieve(regSERV, buffer);
+                        printf("%s cleared!\n", arg1);
+                        break;
+                    }
+                    else {
+                        printf("Server unresponsive... Retrying (%d/%d)\n", (attempts++)+1, UDP_ATTEMPTS);
+                        Send(regSERV, buffer);
+                    }
                 }
-                free(aux);
             }
         }
         else if(strcmp(command, "nodes") == 0){
             if(sscanf(str+6, "%s", arg1)){
                 char *aux = getNodesServer(regSERV, arg1);
+                if (aux == NULL){
+                    printf("Failed to get Nodes from server...\n");
+                    return 0;
+                }
                 printf("%s\n", aux);
                 free(aux);
             }

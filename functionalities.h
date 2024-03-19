@@ -6,6 +6,8 @@
 #define FUNC_H_
 
 #define TIME_OUT 15
+#define UDP_TIME_OUT 5
+#define UDP_ATTEMPTS 3
 
 static volatile int loop = 1;
 
