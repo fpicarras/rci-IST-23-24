@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
     Socket *regSERV = UDPSocket(regIP, regUDP);
     
     Socket *new = NULL;
-    Chord *c_aux = NULL;
+    Chord *c_aux = NULL, *c_aux2 = NULL;
 
     n->selfSOCK = listenTCP;
     // Add the listening port
@@ -94,16 +94,17 @@ int main(int argc, char *argv[]) {
             while (c_aux != NULL) {
                 // Some other chord sent something
                 if (checkFD(s, getFD_Socket(c_aux->s))) {
-                    if (Recieve(c_aux->s, buffer) == 0) {
+                    c_aux2 = c_aux;
+                    c_aux = c_aux->next;
+                    if (Recieve(c_aux2->s, buffer) == 0) {
                         // Chord (others) disconnected
-                        handleChordsDisconnect(n, s, c_aux);
+                        handleChordsDisconnect(n, s, c_aux2);
                     } else {
                         // Handle remaining commands from chord (others)
                         if (VERBOSE) printf("[c-%s]: %s\n", n->c->ID, buffer);
                         handlePredCommands(n, s, buffer);
                     }
-                }
-                c_aux = c_aux->next;
+                } else c_aux = c_aux->next;
             }
         }
         
