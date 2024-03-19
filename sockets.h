@@ -19,7 +19,7 @@
 
 typedef struct _socket Socket;
 
-//CLIENT SIDED
+// CLIENT SIDED
 
 /**
  * @brief Creates a UDP socket (attempts to connecto to node on port "service").
@@ -83,7 +83,7 @@ void closeSocket(Socket *sock, int close_fd);
  */
 int getFD_Socket(Socket *sock);
 
-//SERVED SIDED
+// SERVED SIDED
 
 /**
  * @brief Creates a listening UDP socket on the local machine (0.0.0.0) on port "service".

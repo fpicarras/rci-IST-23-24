@@ -8,7 +8,7 @@ typedef struct _encaminhamento
 {
     char ***routing;
     char **shorter_path;
-    char **fowarding;
+    char **forwarding;
 } Encaminhamento;
 
 /**
@@ -33,7 +33,7 @@ void deleteEncaminhamento(Encaminhamento* e);
  * 
  * @param e Encaminhamento struct
  */
-void ShowFowarding(Encaminhamento *e);
+void Showforwarding(Encaminhamento *e);
 
 /**
  * @brief Prints the shortest path to n_dest

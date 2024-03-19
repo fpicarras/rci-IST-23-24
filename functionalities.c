@@ -4,14 +4,15 @@ Encaminhamento *e = NULL;
 
 void sigHandler(int sig){
     printf("\nCTRL+C detected -> Closing program and Sockets\n");
-    loop = 0;
+    loop = 0; // Signal handler to terminate the program gracefully
 }
 
+// Function to validate command-line arguments
 int validateArguments(int argc, char **argv, char *IP, char *TCP, char *regIP, char *regUDP){
     if(argc != 3 && argc != 5){
         printf("Invalid Arguments!\nUsage: COR IP TCP [regIP] [regUDP]\n");
         return 1;
-    }else{
+    } else {
         strcpy(IP, argv[1]); strcpy(TCP, argv[2]);
         if(argc == 5){
             strcpy(regIP, argv[3]); strcpy(regUDP, argv[4]);
@@ -20,63 +21,69 @@ int validateArguments(int argc, char **argv, char *IP, char *TCP, char *regIP, c
     }
 }
 
+// Function to register a node in the server
 int registerInServer(Socket *server, char *ring, Nodes *n){
     int attempts = 0;
     char buffer[128];
     Select *udp_t = newSelect();
     addFD(udp_t, getFD_Socket(server));
 
+    // Formulate registration message
     sprintf(buffer, "REG %s %s %s %s", ring, n->selfID, n->selfIP, n->selfTCP);
-    Send(server, buffer);
+    Send(server, buffer); // Send registration message
     while(attempts < UDP_ATTEMPTS){
         if(listenSelect(udp_t, UDP_TIME_OUT)>0){
-            Recieve(server, buffer);
+            Recieve(server, buffer); // Receive response
             break;
-        }
-        else {
+        } else {
             printf("Server unresponsive... Retrying (%d/%d)\n", (attempts++)+1, UDP_ATTEMPTS);
-            Send(server, buffer);
+            Send(server, buffer); // Retry sending registration message
         }
     }
     freeSelect(udp_t);
 
+    // Check registration response
     if(strcmp(buffer, "OKREG")==0){
-        printf("Registred as %s in ring %s!\n\n", n->selfID, ring);
+        printf("Registered as %s in ring %s!\n\n", n->selfID, ring);
         return 1;
-    }else{
-        printf("%s\n", buffer);
+    } else {
+        printf("%s\n", buffer); // Print error message
         return 0;
     }
 }
 
+// Function to unregister a node from the server
 int unregisterInServer(Socket *server, char *ring, Nodes *n){
     int attempts = 0;
     char buffer[64];
     Select *udp_t = newSelect();
     addFD(udp_t, getFD_Socket(server));
 
+    // Formulate unregistration message
     sprintf(buffer, "UNREG %s %s", ring, n->selfID);
-    Send(server, buffer);
+    Send(server, buffer); // Send unregistration message
     while(attempts < UDP_ATTEMPTS){
         if(listenSelect(udp_t, UDP_TIME_OUT)>0){
-            Recieve(server, buffer);
+            Recieve(server, buffer); // Receive response
             break;
-        }
-        else {
+        } else {
             printf("Server unresponsive... Retrying (%d/%d)\n", (attempts++)+1, UDP_ATTEMPTS);
-            Send(server, buffer);
+            Send(server, buffer); // Retry sending unregistration message
         }
     }
     freeSelect(udp_t);
+
+    // Check unregistration response
     if(strcmp(buffer, "OKUNREG")==0){
         printf("Leaving ring %s...\n\n", ring);
         return 1;
-    }else {
-        printf("%s\n", buffer);
+    } else {
+        printf("%s\n", buffer); // Print error message
         return 0;
     }
 }
 
+// Function to retrieve nodes from the server
 char *getNodesServer(Socket *server, char *ring){
     char *buffer =(char*)malloc(sizeof(char)*BUFFER_SIZE);
     int attempts = 0;
@@ -84,28 +91,29 @@ char *getNodesServer(Socket *server, char *ring){
     Select *udp_t = newSelect();
     addFD(udp_t, getFD_Socket(server));
 
+    // Formulate request for nodes
     sprintf(buffer, "NODES %s", ring);
-    Send(server, buffer);
+    Send(server, buffer); // Send request for nodes
     while(attempts < UDP_ATTEMPTS){
         if(listenSelect(udp_t, UDP_TIME_OUT)>0){
-            Recieve(server, buffer);
+            Recieve(server, buffer); // Receive response
             break;
-        }
-        else {
+        } else {
             printf("Server unresponsive... Retrying (%d/%d)\n", (attempts++)+1, UDP_ATTEMPTS);
-            Send(server, buffer);
+            Send(server, buffer); // Retry sending request for nodes
         }
     }
     freeSelect(udp_t);
     if(attempts == UDP_ATTEMPTS){
-        free(buffer);
+        free(buffer); // Free buffer in case of failure
         return NULL;
     }
-    return buffer;
+    return buffer; // Return received nodes information
 }
 
+// Function to check if a node is in the server
 void isNodeInServer(char *nodeslist, char *selfID){
-    //Skip NODESLIST r\n
+    // Skip NODESLIST
     char *aux;
     char succID[4], succIP[16], succTCP[8];
 
@@ -129,59 +137,72 @@ void isNodeInServer(char *nodeslist, char *selfID){
         if(available) break;
     }
     printf("Id choosen: %s\n", id);
-    strcpy(selfID, id);
+    strcpy(selfID, id); // Update selfID with the chosen ID
     return;
 }
 
+// Function to send all paths
 void sendAllPaths(Socket *s, char *self){
     char buffer[BUFFER_SIZE];
 
     for(int i = 0; i < 100; i++){
         if(e->shorter_path[i][0] != '\0'){
+            // Formulate path information and send
             sprintf(buffer, "ROUTE %d %d %s\n", atoi(self), i, e->shorter_path[i]);
             Send(s, buffer);
         }
     }
 }
 
+// Function to broadcast a message to all relevant nodes in the network
 void broadcast(Nodes *n, char *msg){
     Chord *aux = n->c;
+    // Send message to successor node if it exists
     if(n->succSOCK != NULL) Send(n->succSOCK, msg);
+    // Send message to predecessor node if it exists and is not the same as the successor
     if(n->predSOCK != NULL && (strcmp(n->succID, n->predID)!=0)) Send(n->predSOCK, msg);
+    // Send message to chord node if it exists
     if(n->chordSOCK != NULL) Send(n->chordSOCK, msg);
+    // Send message to all nodes in the chord list
     while (aux != NULL){
         if(aux->s != NULL) Send(aux->s, msg);
         aux = aux->next;
     }
 }
 
+// Function to delete a chord node from the chord list
 Chord *deleteChord(Chord *head, char *ID){
     Chord *aux1 = head, *aux2 = head;
 
     if(head == NULL) return NULL;
+    // Traverse the chord list to find and delete the node with the specified ID
     while(aux1 != NULL){
         if(strcmp(aux1->ID, ID)==0){
             if(aux1 == head){
+                // If the node to delete is the head of the list
                 aux2 = aux1->next;
                 closeSocket(aux1->s, 1);
                 free(aux1);
-                return aux2;
+                return aux2; // Return the new head of the list
             } else {
+                // If the node to delete is not the head of the list
                 aux2->next = aux1->next;
                 closeSocket(aux1->s, 1);
                 free(aux1);
-                return head;
+                return head; // Return the head of the list remains unchanged
             }
         }
         aux2 = aux1;
         aux1 = aux1->next;
     }
-    return head;
+    return head; // Return the head of the list if the specified ID is not found
 }
 
+// Function to delete all chord nodes from the chord list
 void deleteALLChords(Chord *head, Select *s){
     Chord *aux = head, *aux2 = NULL;
 
+    // Traverse the chord list and delete each node
     while(aux != NULL){
         aux2 = aux->next;
         removeFD(s, getFD_Socket(aux->s));
@@ -191,12 +212,13 @@ void deleteALLChords(Chord *head, Select *s){
     }
 }
 
+// Function to create a chord node and join it to the network
 void createCHORD(Nodes *n, Select *s, Socket *server, char *ring, char *target){
     char ID[4], IP[16], TCP[8], buffer[16];
     char *aux = NULL, *aux1 = NULL;
 
-    if (strcmp (n->predID, n->ssuccID) != 0){ // Há mais de 3 nós
-        if (strcmp (n->chordID, "") == 0){
+    if (strcmp (n->predID, n->ssuccID) != 0){ // More than 3 nodes exist
+        if (strcmp (n->chordID, "") == 0){ // Node is not already part of a chord
             aux = getNodesServer(server, ring);
             if (aux == NULL){
                 printf("Failed to get Nodes from server...\n");
@@ -204,138 +226,151 @@ void createCHORD(Nodes *n, Select *s, Socket *server, char *ring, char *target){
                 return;
             }
             aux1 = aux + 14;
+            // Iterate through nodes received from the server
             while(sscanf(aux1, "%s %s %s", ID, IP, TCP)==3){
-                if (e->routing[0][atoi(ID)][0] == '\0'){
-                    //If we have a target, we only try to connect to it
+                if (e->routing[0][atoi(ID)][0] == '\0'){ // Check if the node is not already in the routing table
+                    // If a target node is specified, only try to connect to it
                     if(target != NULL){
                         if(strcmp(target, ID) != 0){
                             aux1 += 3+strlen(ID)+strlen(IP)+strlen(TCP);
                             continue;
                         }
                     }
-
                     n->chordSOCK = TCPSocket(IP, TCP);
                     if(n->chordSOCK == NULL){
-                        printf("Unable to connec to target node %s\n", ID);
+                        printf("Unable to connect to target node %s\n", ID);
                         free(aux);
                         return;
                     }
-                    //If connection as succeceful fill n with the succ info -> s(self) = succ
+                    // If connection is successful, update node's information and send the ENTRY command
                     addFD(s, getFD_Socket(n->chordSOCK));
                     strcpy(n->chordID, ID); strcpy(n->chordIP, IP); strcpy(n->chordTCP, TCP);
-                    //Sending the ENTRY command
                     sprintf(buffer, "CHORD %s\n", n->selfID);
-                    Send(n->chordSOCK, buffer);
-                    
-                    //Waiting for response!
-                    addFD(s, getFD_Socket(n->chordSOCK));
-                    
-                    sendAllPaths(n->chordSOCK, n->selfID);
-
+                    Send(n->chordSOCK, buffer); // Send ENTRY command to the target node
+                    addFD(s, getFD_Socket(n->chordSOCK)); // Wait for response
+                    sendAllPaths(n->chordSOCK, n->selfID); // Send all paths to the newly connected node
                     break;
                 }
                 aux1 += 3+strlen(ID)+strlen(IP)+strlen(TCP);
             }
             free(aux);
-        } else printf ("Already in a chord ...");
-    } else printf ("3 nodes in the ring...");
+        } else printf ("Already in a chord ..."); // Node is already part of a chord
+    } else printf ("3 nodes in the ring..."); // Only 3 nodes exist in the ring
 }
 
+// Function to directly join a ring by connecting to the successor node and waiting for the predecessor to connect
 int directJoin(Nodes *n, Select *sel, char *succID, char *succIP, char *succTCP){
+    // Allocate memory for buffer
     char *buffer = (char*)malloc(BUFFER_SIZE*sizeof(char));
-    //printf("Attempting to join to: %s %s:%s\n", succID, succIP, succTCP);
-    //New select structure to listen to incoming data from sockets
+    
+    // New select structure to listen to incoming data from sockets
     Select *s = newSelect();
-    //Attempt to connect to the succ node
+    
+    // Attempt to connect to the successor node
     Socket *succ = TCPSocket(succIP, succTCP);
     if(succ == NULL){
-        printf("Unable to connec to succesor %s\n", succID);
-        freeSelect(s); free(buffer);
+        printf("Unable to connect to successor %s\n", succID);
+        freeSelect(s); 
+        free(buffer);
         return 0;
     }
-    //If connection as succeceful fill n with the succ info -> s(self) = succ
+    
+    // If connection was successful, fill n with the successor info -> s(self) = succ
     addFD(sel, getFD_Socket(succ));
-    strcpy(n->succID, succID); strcpy(n->succIP, succIP); strcpy(n->succTCP, succTCP);
+    strcpy(n->succID, succID); 
+    strcpy(n->succIP, succIP); 
+    strcpy(n->succTCP, succTCP);
     n->succSOCK = succ;
-    //Sending the ENTRY command
+    
+    // Sending the ENTRY command
     sprintf(buffer, "ENTRY %s %s %s\n", n->selfID, n->selfIP, n->selfTCP);
     Send(succ, buffer);
     
-    //Waiting for response!
+    // Waiting for response
     addFD(s, getFD_Socket(succ));
     if(listenSelect(s, TIME_OUT) > 0){
-        //If the succ sent a response
+        // If the successor sent a response
         if(checkFD(s, getFD_Socket(succ))){
             Recieve(succ, buffer);
             sscanf(buffer, "SUCC %s %s %s\n", n->ssuccID, n->ssuccIP, n->ssuccTCP);
-            //Fill the ssucc info in n             
+            // Fill the ssucc info in n
         }
     }else{
-        //In case of time-out
-        printf("Timed-out waiting for succ %s after %d seconds...\n", succID, TIME_OUT);
+        // In case of timeout
+        printf("Timed-out waiting for successor %s after %d seconds...\n", succID, TIME_OUT);
         closeSocket(succ, 1);
         free(buffer);
         freeSelect(s);
         return 0;
     }
 
-    //Now we will wait for the pred to connect announcing itself
-        //We will listen to out TCP port
+    // Now we will wait for the predecessor to connect announcing itself
+    // We will listen to our TCP port
     removeFD(s, getFD_Socket(succ));
     addFD(s, getFD_Socket(n->selfSOCK));
     if(listenSelect(s, TIME_OUT) > 0){
-        //If the pred connected we will wait for its response
+        // If the predecessor connected, we will wait for its response
         if(checkFD(s, getFD_Socket(n->selfSOCK))){
-            // p(self) = pred
             n->predSOCK = TCPserverAccept(n->selfSOCK);
             Recieve(n->predSOCK, buffer);
             sscanf(buffer, "PRED %s\n", n->predID);
             addFD(sel, getFD_Socket(n->predSOCK));
         }
     }else{
-        //In case of time-out
-        printf("Timed-out waiting for pred after %d seconds...\n", TIME_OUT);
+        // In case of timeout
+        printf("Timed-out waiting for predecessor after %d seconds...\n", TIME_OUT);
         closeSocket(succ, 1);
         free(buffer);
         freeSelect(s);
         return 0;
     }
+    
     printf("\nJoined!\nSUCC: %s [%s:%s]\nSSUCC: %s [%s:%s]\nPRED: %s\n\n", n->succID, n->succIP, n->succTCP, n->ssuccID, n->ssuccIP, n->ssuccTCP, n->predID);
     
-    //Send to our new neighbour our paths
+    // Send to our new neighbor our paths
     sendAllPaths(n->predSOCK, n->selfID);
-    //Send to our new neighbour our paths
-    if(strcmp(n->succID, n->predID) != 0) sendAllPaths(n->succSOCK, n->selfID);
-    //printf("here\n"); fflush(stdin);
+    // Send to our new neighbor our paths
+    if(strcmp(n->succID, n->predID) != 0) 
+        sendAllPaths(n->succSOCK, n->selfID);
+    
     free(buffer);
     freeSelect(s);
     return 1;
 }
 
+// Function to join a ring by connecting to the successor node and waiting for the predecessor to connect
 int join(Socket *regSERV, Nodes *n, Select *sel, char *ring){
     char succID[3], succIP[16], succTCP[8];
-    //Gets the list of connected Nodes
+    
+    // Gets the list of connected Nodes
     char *aux = getNodesServer(regSERV, ring);
     if (aux == NULL){
         printf("Failed to get Nodes from server...\n");
         return 0;
     }
-    //Ensures that out id is unique, if it isn't we try to get a new one
+    
+    // Ensures that our id is unique, if it isn't we try to get a new one
     isNodeInServer(aux, n->selfID);
-    //Skip NODESLIST r\n
+    
+    // Skip NODESLIST
     if(sscanf(aux+14, "%s %s %s", succID, succIP, succTCP)!=3){
-        //The ring is empty
-        strcpy(n->succID, n->selfID); strcpy(n->succIP, n->selfIP); strcpy(n->succTCP, n->selfTCP);
-        strcpy(n->ssuccID, n->selfID); strcpy(n->ssuccIP, n->selfIP); strcpy(n->ssuccTCP, n->selfTCP);
+        // The ring is empty
+        strcpy(n->succID, n->selfID); 
+        strcpy(n->succIP, n->selfIP); 
+        strcpy(n->succTCP, n->selfTCP);
+        strcpy(n->ssuccID, n->selfID); 
+        strcpy(n->ssuccIP, n->selfIP); 
+        strcpy(n->ssuccTCP, n->selfTCP);
         strcpy(n->predID, n->selfID);
-        strcpy (n->chordID, ""); strcpy (n->chordIP, ""); strcpy (n->chordTCP, "");
+        strcpy(n->chordID, ""); 
+        strcpy(n->chordIP, ""); 
+        strcpy(n->chordTCP, "");
         free(aux);
         return 1;
     }else{
         free(aux);
         return directJoin(n, sel, succID, succIP, succTCP);
     }
-
 }
 
 void handleROUTE(Nodes *n, char *msg){
@@ -368,7 +403,7 @@ void messageHANDLER(Nodes *n, char *msg){
      * arrives saying [dest] left, somewhere in the path this condition will send a message back
      * reporting that it will never arrive, for this node already left the ring...
     */
-    if(e->fowarding[n_dest][0] == '\0'){
+    if(e->forwarding[n_dest][0] == '\0'){
         sprintf(message, "Node [%s] is no longer in the ring...", dest);
         sprintf(buffer, "CHAT %s %s %s\n", n->selfID, origin, message);
         messageHANDLER(n, buffer);
@@ -377,13 +412,13 @@ void messageHANDLER(Nodes *n, char *msg){
         printf("[%s]: %s\n", origin, message);
     }else {
         //Forward this message
-        if(atoi(e->fowarding[n_dest])==atoi(n->predID)) Send(n->predSOCK, msg);
-        else if(atoi(e->fowarding[n_dest])==atoi(n->succID)) Send(n->succSOCK, msg);
-        else if(atoi(e->fowarding[n_dest])==atoi(n->chordID)) Send(n->chordSOCK, msg);
+        if(atoi(e->forwarding[n_dest])==atoi(n->predID)) Send(n->predSOCK, msg);
+        else if(atoi(e->forwarding[n_dest])==atoi(n->succID)) Send(n->succSOCK, msg);
+        else if(strcmp(n->chordID, "")!=0 && atoi(e->forwarding[n_dest])==atoi(n->chordID)) Send(n->chordSOCK, msg);
         else {
             while (c_aux != NULL){
-                if (atoi(e->fowarding[n_dest])==atoi(c_aux->ID)) Send(c_aux->s, msg);
-                c_aux = c_aux->next; //Isto da merda (acho eu)                                  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                if (atoi(e->forwarding[n_dest])==atoi(c_aux->ID)) Send(c_aux->s, msg);
+                c_aux = c_aux->next;
             }
         }
     }
@@ -610,10 +645,6 @@ void handlePredCommands(Nodes *n, Select *s, char *msg){
     }
 }
 
-/*void handleChordsCommands(Nodes *n, Select *s, char *msg){
-    
-}*/
-
 void handleNewConnection(Nodes *n, Select *s, Chord **c_head, Socket *new, char *msg){
     char buffer[BUFFER_SIZE], command[16];
     Chord *new_c = NULL;
@@ -745,14 +776,14 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
         // SHOW FORWARDING
         else if (strcmp(command, "sf") == 0) {          
             if(connected){      
-                ShowFowarding (e); 
+                Showforwarding (e); 
             } else printf("Not connected...\n\n"); 
         }
         // MESSAGE [dest] [message]
         else if (strcmp(command, "m") == 0) {
             if(connected){ 
                 if (sscanf(str + 2, "%s", arg1) == 1){
-                    if (sscanf(str + 5, "%[^\n]", message) != 1) return 0;                  /* EXIT 0 ??? tas maluco*/
+                    if (sscanf(str + 5, "%[^\n]", message) != 1) return 0;
                     if (strcmp (arg1, n->selfID) == 0) printf ("%s\n\n", message);
                     else {
                         sprintf(buffer, "CHAT %s %s %s\n", n->selfID, arg1, message);
@@ -780,8 +811,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                     }
                     deleteALLChords(n->c, s);
                     n->c = NULL;
-                    deleteEncaminhamento(e);
-                    
+                    deleteEncaminhamento(e); 
                 } else printf("Not connected...\n\n");            
                 connected = 0;
             }
@@ -807,7 +837,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                 n->c = NULL;
                 deleteEncaminhamento(e);
                 connected = 0;
-            }
+            } else printf("Not connected...\n\n");  
             return 1;             
         }
         else if(strcmp(command, "clear") == 0){
@@ -829,6 +859,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                         Send(regSERV, buffer);
                     }
                 }
+                freeSelect (udp_t); 
             }
         }
         else if(strcmp(command, "nodes") == 0){

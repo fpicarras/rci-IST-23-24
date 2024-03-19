@@ -1,4 +1,4 @@
-#include "fowarding.h" 
+#include "forwarding.h" 
 #include "sockets.h"
 #include "select.h"
 
@@ -106,8 +106,6 @@ void handlePredCommands(Nodes *n, Select *s, char *msg);
  * @param e
  */
 void handlePredDisconnect(Nodes *n, Select *s);
-
-//void handleChordsCommands(Nodes *n, Select *s, char *msg);
 
 void handleChordsDisconnect(Nodes *n, Select *s, Chord* c);
 
