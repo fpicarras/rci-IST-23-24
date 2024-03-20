@@ -116,10 +116,9 @@ void isNodeInServer(char *nodeslist, char *selfID){
     // Skip NODESLIST
     char *aux;
     char succID[4], succIP[16], succTCP[8];
-
     char id[4]; strcpy(id, selfID);
-
     int available, i=0;
+    
     while(1){
         aux = nodeslist+14;
         available = 1;
@@ -339,11 +338,14 @@ int directJoin(Nodes *n, Select *sel, char *succID, char *succIP, char *succTCP)
 }
 
 // Function to join a ring by connecting to the successor node and waiting for the predecessor to connect
-int join(Socket *regSERV, Nodes *n, Select *sel, char *ring){
+int join(Socket *regSERV, Nodes *n, Select *sel, char *ring, char *suc){
     char succID[3], succIP[16], succTCP[8];
-    
+    char *aux = NULL, *aux2 = NULL;
+    int flag = 0;
+
     // Gets the list of connected Nodes
-    char *aux = getNodesServer(regSERV, ring);
+    aux = getNodesServer(regSERV, ring);
+
     if (aux == NULL){
         printf("Failed to get Nodes from server...\n");
         return 0;
@@ -367,7 +369,23 @@ int join(Socket *regSERV, Nodes *n, Select *sel, char *ring){
         strcpy(n->chordTCP, "");
         free(aux);
         return 1;
-    }else{
+    } else {
+        if (suc != NULL){
+            aux2 = aux + 14;
+            while (sscanf(aux2, "%s %s %s", succID, succIP, succTCP)==3){
+                if (strcmp(suc, succID) == 0){
+                    flag = 1;
+                    break;
+                }
+                aux2 += 16;
+            }
+            if (flag == 0){
+                if (sscanf(aux+14, "%s %s %s", succID, succIP, succTCP)==3){
+                    printf ("Node %s is not resgistred in server!\n", suc);
+                }
+            }
+        }
+        printf ("Your successor is %s!\n", succID);
         free(aux);
         return directJoin(n, sel, succID, succIP, succTCP);
     }
@@ -708,14 +726,19 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                 printf("Already connected! Leave current connection to enter a new one...\n");
                 return 0;
             }
-            if (sscanf(str + offset, "%s %s", arg1, arg2) == 2){
+            if (sscanf(str + offset, "%s %s %s", arg1, arg2, arg3) == 3){
                 strcpy(n->selfID, arg2); strcpy(ring, arg1);
                 e = initEncaminhamento(n->selfID);
-                if(join(regSERV, n, s, ring)){
+                if(join(regSERV, n, s, ring, arg3)){
                     if(registerInServer(regSERV, ring, n)) connected = 1;
                 }
-
-            } else printf("Invalid interface command!\n");
+            } else if (sscanf(str + offset, "%s %s", arg1, arg2) == 2){
+                strcpy(n->selfID, arg2); strcpy(ring, arg1);
+                e = initEncaminhamento(n->selfID);
+                if(join(regSERV, n, s, ring, NULL)){
+                    if(registerInServer(regSERV, ring, n)) connected = 1;
+                } else printf("Invalid interface command!\n");
+            }
         }
         // DIRECT JOIN [id] [succid] [succIP] [succTCP]
         else if (strcmp(command, "dj") == 0) {
@@ -799,6 +822,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                 /* DISCONNECT FROM NODES */
                 if(!(strcmp(ring, "---")==0) && unregisterInServer(regSERV, ring, n)){
                     strcpy(ring, "---");
+                    connected = 0;
                 }
                 if(n->predSOCK != NULL && n->succSOCK != NULL){
                     removeFD(s, getFD_Socket(n->predSOCK)); removeFD(s, getFD_Socket(n->succSOCK));
@@ -812,8 +836,8 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                     deleteALLChords(n->c, s);
                     n->c = NULL;
                     deleteEncaminhamento(e); 
-                } else printf("Not connected...\n\n");            
-                connected = 0;
+                    connected = 0;
+                } else printf("Not connected...\n\n");      
             }
         }
         // EXIT
