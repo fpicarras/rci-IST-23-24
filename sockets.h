@@ -29,6 +29,8 @@ typedef struct _socket Socket;
  */
 int check_ipv4 (char *IP);
 
+char *getAddress(Socket* sock);
+
 /**
  * @brief Creates a UDP socket (attempts to connecto to node on port "service").
  * 

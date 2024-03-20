@@ -303,16 +303,27 @@ int directJoin(Nodes *n, Select *sel, char *succID, char *succIP, char *succTCP)
     if(listenSelect(s, TIME_OUT) > 0){
         // If the successor sent a response
         if(checkFD(s, getFD_Socket(succ))){
-            Recieve(succ, buffer);
+            if(Recieve(succ, buffer)<=0){
+                // In case of timeout
+                printf("Successor %s disconnected from us...\n", succID);
+                removeFD(sel, getFD_Socket(succ));
+                closeSocket(succ, 1);
+                free(buffer);
+                freeSelect(s);
+                n->succSOCK = NULL;
+                return 0;
+            }
             sscanf(buffer, "SUCC %s %s %s\n", n->ssuccID, n->ssuccIP, n->ssuccTCP);
             // Fill the ssucc info in n
         }
     }else{
         // In case of timeout
         printf("Timed-out waiting for successor %s after %d seconds...\n", succID, TIME_OUT);
+        removeFD(sel, getFD_Socket(succ));
         closeSocket(succ, 1);
         free(buffer);
         freeSelect(s);
+        n->succSOCK = NULL;
         return 0;
     }
 
@@ -324,16 +335,29 @@ int directJoin(Nodes *n, Select *sel, char *succID, char *succIP, char *succTCP)
         // If the predecessor connected, we will wait for its response
         if(checkFD(s, getFD_Socket(n->selfSOCK))){
             n->predSOCK = TCPserverAccept(n->selfSOCK);
-            Recieve(n->predSOCK, buffer);
+            if(Recieve(n->predSOCK, buffer)<=0){
+                printf("Predecessor disconnected from us...\n");
+                removeFD(sel, getFD_Socket(n->succSOCK));
+                closeSocket(succ, 1);
+                closeSocket(n->predSOCK, 1);
+                free(buffer);
+                freeSelect(s);
+                n->predSOCK = NULL;
+                n->succSOCK = NULL;
+                return 0;
+            }
             sscanf(buffer, "PRED %s\n", n->predID);
             addFD(sel, getFD_Socket(n->predSOCK));
         }
     }else{
         // In case of timeout
         printf("Timed-out waiting for predecessor after %d seconds...\n", TIME_OUT);
-        closeSocket(succ, 1);
         free(buffer);
         freeSelect(s);
+        removeFD(sel, getFD_Socket(n->succSOCK));
+        closeSocket(succ, 1);
+        closeSocket(n->predSOCK, 1);
+        n->succSOCK = NULL;
         return 0;
     }
     
@@ -457,10 +481,15 @@ void messageHANDLER(Nodes *n, char *msg){
 
 void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
     int *aux = NULL;
-    char buffer[64], newID[4], newIP[16], newTCP[8];
+    char buffer[64], newID[4], newIP[16], newTCP[8], *aux_ip;
 
     sscanf(msg, "ENTRY %s %s %s\n", newID, newIP, newTCP);
-
+    aux_ip = getAddress(new_node);
+    if(strcmp(newIP, aux_ip)!=0){
+        printf("New connection announced a different IP from it's own... Disconnecting from them...\n");
+        closeSocket(new_node, 1);
+        return;
+    }
     if(strcmp(newID, n->selfID)==0){
         printf("New connection trying the same id... Disconnecting from them...\n");
         closeSocket(new_node, 1);
@@ -536,6 +565,9 @@ void handleSuccDisconnect(Nodes *n, Select *s){
     if(aux != NULL) free(aux);
 
     if(strcmp(n->selfID, n->ssuccID)!=0){
+        //If the node we will connect to is already connected via our chord, remove that chord
+        if(strcmp(n->chordID, n->ssuccID)==0) handleOurChordDisconnect(n, s);
+
         new = TCPSocket(n->ssuccIP, n->ssuccTCP);
         strcpy(n->succID, n->ssuccID); strcpy(n->succIP, n->ssuccIP); strcpy(n->succTCP, n->ssuccTCP);
         n->succSOCK = new; addFD(s, getFD_Socket(new));
@@ -570,6 +602,25 @@ void handlePredDisconnect(Nodes *n, Select *s){
             broadcast(n, buffer);
         }
         if(aux != NULL) free(aux);
+    }
+
+    //If there was already someone to connect to us as pred
+    if(n->possible_predSOCK != NULL){
+        printf("Setting %s as pred\n", n->possible_predID);
+        strcpy(n->predID, n->possible_predID);
+        n->predSOCK = n->possible_predSOCK;
+        n->possible_predSOCK = NULL;
+
+        if(strcmp(n->predID, n->chordID) == 0){
+                handleOurChordDisconnect(n, s);
+            }
+        addFD(s, getFD_Socket(n->predSOCK));
+
+        //Send to our new neighbour our paths
+        sendAllPaths(n->predSOCK, n->selfID);
+
+        sprintf(buffer, "SUCC %s %s %s\n", n->succID, n->succIP, n->succTCP);
+        Send(n->predSOCK, buffer);
     }
 }
 
@@ -683,6 +734,14 @@ void handleNewConnection(Nodes *n, Select *s, Chord **c_head, Socket *new, char 
     if(sscanf(msg, "%s", command)){
         if(strcmp(command, "ENTRY")==0) handleENTRY(n, new, s, msg);
         if(strcmp(command, "PRED")==0){
+            //Pred is still connected to us, we leave this new connection on hold
+            if(n->predSOCK != NULL){
+                sscanf(msg, "PRED %s\n", n->possible_predID);
+                n->possible_predSOCK = new;
+                //printf("Placed %s on hold\n", n->possible_predID);
+                return;
+            }
+
             sscanf(msg, "PRED %s\n", n->predID);
             if(strcmp(n->predID, n->chordID) == 0){
                 handleOurChordDisconnect(n, s);
@@ -744,14 +803,18 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                 e = initEncaminhamento(n->selfID);
                 if(join(regSERV, n, s, ring, arg3)){
                     if(registerInServer(regSERV, ring, n)) connected = 1;
+                }else{
+                    deleteEncaminhamento(e);
                 }
             } else if (sscanf(str + offset, "%s %s", arg1, arg2) == 2){
                 strcpy(n->selfID, arg2); strcpy(ring, arg1);
                 e = initEncaminhamento(n->selfID);
                 if(join(regSERV, n, s, ring, NULL)){
                     if(registerInServer(regSERV, ring, n)) connected = 1;
-                } else printf("Invalid interface command!\n");
-            }
+                }else {
+                    deleteEncaminhamento(e);
+                } 
+            } else printf("Invalid interface command!\n");
         }
         // DIRECT JOIN [id] [succid] [succIP] [succTCP]
         else if (strcmp(command, "dj") == 0) {
@@ -838,7 +901,6 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                     connected = 0;
                 }
                 if(n->predSOCK != NULL && n->succSOCK != NULL){
-                    printf("Leave has been pressed\n");
                     removeFD(s, getFD_Socket(n->predSOCK)); removeFD(s, getFD_Socket(n->succSOCK));
                     closeSocket(n->succSOCK, 1); closeSocket(n->predSOCK, 1);
                     n->predSOCK = NULL; n->succSOCK = NULL;
@@ -851,8 +913,36 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                     n->c = NULL;
                     deleteEncaminhamento(e); 
                     connected = 0;
-                } else printf("Not connected...\n\n");      
-            }
+                }    
+            }else printf("Not connected...\n\n");  
+        }
+        //LEAVE TEST DELAY                                                  <---- TO REMOVE
+        else if (strcmp(command, "lp") == 0) {     
+            if(connected){
+                /* DISCONNECT FROM NODES */
+                if(!(strcmp(ring, "---")==0) && unregisterInServer(regSERV, ring, n)){
+                    strcpy(ring, "---");
+                    connected = 0;
+                }
+                if(n->predSOCK != NULL && n->succSOCK != NULL){
+                    removeFD(s, getFD_Socket(n->predSOCK)); removeFD(s, getFD_Socket(n->succSOCK));
+                    closeSocket(n->predSOCK, 1);
+
+                    sleep(5);
+                    
+                    closeSocket(n->succSOCK, 1);
+                    n->predSOCK = NULL; n->succSOCK = NULL;
+                    if (strcmp (n->chordID, "") != 0){
+                        removeFD(s, getFD_Socket(n->chordSOCK)); closeSocket(n->chordSOCK, 1);
+                        n->chordSOCK = NULL;
+                        strcpy (n->chordID, ""); strcpy (n->chordIP, "");  strcpy (n->chordTCP, "");
+                    }
+                    deleteALLChords(n->c, s);
+                    n->c = NULL;
+                    deleteEncaminhamento(e); 
+                    connected = 0;
+                }     
+            }else printf("Not connected...\n\n"); 
         }
         // EXIT
         else if (strcmp(command, "x") == 0) {          

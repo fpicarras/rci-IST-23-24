@@ -40,6 +40,9 @@ typedef struct _nodes{
     char chordTCP[6];
     Socket *chordSOCK;
 
+    char possible_predID[3];
+    Socket *possible_predSOCK;
+
     Chord *c;
 
 }Nodes;

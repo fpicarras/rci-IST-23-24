@@ -86,16 +86,24 @@ void hostName(char *s){
 }
 
 // Function to print the address of a socket.
-void getAdress(Socket* sock){
-    char buffer[INET_ADDRSTRLEN];
+char *getAddress(Socket* sock){
+    char *buffer = (char*)malloc(INET_ADDRSTRLEN*sizeof(char));
     struct in_addr *addr;
     struct addrinfo *p;
+
+    if(sock->res == NULL){
+        struct sockaddr_in *ipv4 = (struct sockaddr_in *)(&(sock->addr));
+        inet_ntop(AF_INET, &(ipv4->sin_addr), buffer, INET_ADDRSTRLEN);
+        return buffer;
+    }
 
     for(p = sock->res; p != NULL; p = p->ai_next){
         struct sockaddr_in *ip = (struct sockaddr_in *)p->ai_addr;
         addr = &(ip->sin_addr);
         printf("%s\n", inet_ntop(p->ai_family, addr, buffer, sizeof(buffer)));
     }
+    free(buffer);
+    return NULL;
 }
 
 /* CLIENT SIDE CODE */
