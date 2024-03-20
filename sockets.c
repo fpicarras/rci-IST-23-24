@@ -18,6 +18,17 @@ int typeSocket(Socket *sock){
     return type;
 }
 
+// Function to verify IPv4 address
+int check_ipv4 (char *IP){
+    struct in_addr dest;
+    
+    if (inet_pton(AF_INET, IP, &dest) == 0){
+        printf ("%s is not a valid IPv4 address!\n", IP);
+        return 1;
+    }
+    return 0;
+}
+
 // Function to initialize a generic socket structure.
 Socket *initSocket(int domain, int type, int protocol, int flags, char *node, char *service){
     struct addrinfo hints, *res;

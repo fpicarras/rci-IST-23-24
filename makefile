@@ -9,4 +9,4 @@ all:
 	gcc -o $(NAME) main.c $(FILES) $(CFLAGS)
 
 clean:
-	rm -rf teste $(NAME)
+	rm -rf $(NAME)

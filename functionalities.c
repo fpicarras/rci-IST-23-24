@@ -13,8 +13,10 @@ int validateArguments(int argc, char **argv, char *IP, char *TCP, char *regIP, c
         printf("Invalid Arguments!\nUsage: COR IP TCP [regIP] [regUDP]\n");
         return 1;
     } else {
+        if (check_ipv4(argv[1])) return 1;
         strcpy(IP, argv[1]); strcpy(TCP, argv[2]);
         if(argc == 5){
+            if (check_ipv4(argv[3])) return 1;
             strcpy(regIP, argv[3]); strcpy(regUDP, argv[4]);
         }
         return 0;
@@ -215,6 +217,7 @@ void deleteALLChords(Chord *head, Select *s){
 void createCHORD(Nodes *n, Select *s, Socket *server, char *ring, char *target){
     char ID[4], IP[16], TCP[8], buffer[16];
     char *aux = NULL, *aux1 = NULL;
+    int flag = 0;
 
     if (strcmp (n->predID, n->ssuccID) != 0){ // More than 3 nodes exist
         if (strcmp (n->chordID, "") == 0){ // Node is not already part of a chord
@@ -230,28 +233,38 @@ void createCHORD(Nodes *n, Select *s, Socket *server, char *ring, char *target){
                 if (e->routing[0][atoi(ID)][0] == '\0'){ // Check if the node is not already in the routing table
                     // If a target node is specified, only try to connect to it
                     if(target != NULL){
-                        if(strcmp(target, ID) != 0){
-                            aux1 += 3+strlen(ID)+strlen(IP)+strlen(TCP);
-                            continue;
+                        if(strcmp(target, ID) == 0){
+                            flag = 1;
+                            break;
                         }
                     }
-                    n->chordSOCK = TCPSocket(IP, TCP);
-                    if(n->chordSOCK == NULL){
-                        printf("Unable to connect to target node %s\n", ID);
-                        free(aux);
-                        return;
-                    }
-                    // If connection is successful, update node's information and send the ENTRY command
-                    addFD(s, getFD_Socket(n->chordSOCK));
-                    strcpy(n->chordID, ID); strcpy(n->chordIP, IP); strcpy(n->chordTCP, TCP);
-                    sprintf(buffer, "CHORD %s\n", n->selfID);
-                    Send(n->chordSOCK, buffer); // Send ENTRY command to the target node
-                    addFD(s, getFD_Socket(n->chordSOCK)); // Wait for response
-                    sendAllPaths(n->chordSOCK, n->selfID); // Send all paths to the newly connected node
-                    break;
                 }
                 aux1 += 3+strlen(ID)+strlen(IP)+strlen(TCP);
             }
+            if (flag == 0){
+                aux1 = aux + 14;
+                while(sscanf(aux1, "%s %s %s", ID, IP, TCP)==3){
+                    if (e->routing[0][atoi(ID)][0] == '\0'){
+                        if (target != NULL) printf ("Node %s is not resgistred in server!\n", target);
+                        break;
+                    }
+                    aux1 += 3+strlen(ID)+strlen(IP)+strlen(TCP);
+                }
+            }
+            printf ("Your chord is %s!\n", ID);
+            n->chordSOCK = TCPSocket(IP, TCP);
+            if(n->chordSOCK == NULL){
+                printf("Unable to connect to target node %s\n", ID);
+                free(aux);
+                return;
+            }
+            // If connection is successful, update node's information and send the ENTRY command
+            addFD(s, getFD_Socket(n->chordSOCK));
+            strcpy(n->chordID, ID); strcpy(n->chordIP, IP); strcpy(n->chordTCP, TCP);
+            sprintf(buffer, "CHORD %s\n", n->selfID);
+            Send(n->chordSOCK, buffer); // Send ENTRY command to the target node
+            addFD(s, getFD_Socket(n->chordSOCK)); // Wait for response
+            sendAllPaths(n->chordSOCK, n->selfID); // Send all paths to the newly connected node
             free(aux);
         } else printf ("Already in a chord ..."); // Node is already part of a chord
     } else printf ("3 nodes in the ring..."); // Only 3 nodes exist in the ring

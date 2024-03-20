@@ -22,6 +22,14 @@ typedef struct _socket Socket;
 // CLIENT SIDED
 
 /**
+ * @brief Function to verify IPv4 address.
+ * 
+ * @param IP A string representing the IPv4 address to be checked.
+ * @return Returns 0 if the IP address is valid IPv4, otherwise returns 1.
+ */
+int check_ipv4 (char *IP);
+
+/**
  * @brief Creates a UDP socket (attempts to connecto to node on port "service").
  * 
  * UDP sockets are faster but do not garantee package reception or order.
