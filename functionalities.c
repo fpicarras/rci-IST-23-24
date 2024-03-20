@@ -372,12 +372,12 @@ int join(Socket *regSERV, Nodes *n, Select *sel, char *ring, char *suc){
     } else {
         if (suc != NULL){
             aux2 = aux + 14;
-            while (sscanf(aux2, "%s %s %s", succID, succIP, succTCP)==3){
+            while (sscanf(aux2, "%s %s %s\n", succID, succIP, succTCP)==3){
                 if (strcmp(suc, succID) == 0){
                     flag = 1;
                     break;
                 }
-                aux2 += 16;
+                aux2 += (strlen(succID) + strlen(succIP) + strlen(succTCP) + 3);
             }
             if (flag == 0){
                 if (sscanf(aux+14, "%s %s %s", succID, succIP, succTCP)==3){
