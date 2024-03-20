@@ -60,6 +60,7 @@ int main(int argc, char *argv[]) {
             if ((n->succSOCK != NULL) && checkFD(s, getFD_Socket(n->succSOCK))) {
                 if (Recieve(n->succSOCK, buffer) == 0) {
                     // Successor disconnected
+                    printf("Succ disconnected!\n");
                     handleSuccDisconnect(n, s);
                 } else {
                     // Handle remaining commands from successor
@@ -69,8 +70,10 @@ int main(int argc, char *argv[]) {
             }
             // Predecessor sent something
             if ((n->predSOCK != NULL) && checkFD(s, getFD_Socket(n->predSOCK))) {
+                printf("Pred message!\n");
                 if (Recieve(n->predSOCK, buffer) == 0) {
                     // Predecessor disconnected
+                    printf("Pred diconnected!\n");
                     handlePredDisconnect(n, s);
                 } else {
                     // Handle remaining commands from predecessor

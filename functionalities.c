@@ -825,8 +825,9 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                     connected = 0;
                 }
                 if(n->predSOCK != NULL && n->succSOCK != NULL){
+                    printf("Leave has been pressed\n");
                     removeFD(s, getFD_Socket(n->predSOCK)); removeFD(s, getFD_Socket(n->succSOCK));
-                    closeSocket(n->predSOCK, 1); closeSocket(n->succSOCK, 1);
+                    closeSocket(n->succSOCK, 1); closeSocket(n->predSOCK, 1);
                     n->predSOCK = NULL; n->succSOCK = NULL;
                     if (strcmp (n->chordID, "") != 0){
                         removeFD(s, getFD_Socket(n->chordSOCK)); closeSocket(n->chordSOCK, 1);
@@ -850,7 +851,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                 }
                 if(n->predSOCK != NULL && n->succSOCK != NULL){
                     removeFD(s, getFD_Socket(n->predSOCK)); removeFD(s, getFD_Socket(n->succSOCK));
-                    closeSocket(n->predSOCK, 1); closeSocket(n->succSOCK, 1);
+                    closeSocket(n->succSOCK, 1); closeSocket(n->predSOCK, 1);
                     n->predSOCK = NULL; n->succSOCK = NULL;
                     if (strcmp (n->chordID, "") != 0){
                         removeFD(s, getFD_Socket(n->chordSOCK)); closeSocket(n->chordSOCK, 1);

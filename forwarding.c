@@ -176,10 +176,12 @@ int addPath(Encaminhamento *e, char *self, char *origin, char *dest, char *path)
         if (strcmp(e->shorter_path[n_dest], e->routing[n_dest + 1][n_origin]) == 0) {
             strcpy(e->routing[n_dest + 1][n_origin], "-"); // Remove the path
             if ((aux = findSecondShortest(e, n_origin, n_dest)) == -1) {
+                printf("%s <- null\n", e->shorter_path[n_dest]);
                 strcpy(e->shorter_path[n_dest], "");
                 strcpy(e->forwarding[n_dest], "");
                 return 1; // No alternate path available
             } else {
+                printf("%s <- %s\n", e->shorter_path[n_dest], e->routing[n_dest + 1][aux]);
                 strcpy(e->shorter_path[n_dest], e->routing[n_dest + 1][aux]);
                 sprintf(e->forwarding[n_dest], "%d", aux);
                 return 1; // Alternate path set
@@ -201,13 +203,16 @@ int addPath(Encaminhamento *e, char *self, char *origin, char *dest, char *path)
 
         if (e->shorter_path[n_dest][0] == '\0') {
             // Set new path as the shortest path
+            printf("%s <- ", e->shorter_path[n_dest]);
             sprintf(e->shorter_path[n_dest], "%d-%s", n_self, path);
             sprintf(e->forwarding[n_dest], "%d", n_origin);
+            printf("%s\n", e->shorter_path[n_dest]);
             return 1; // New path added
         } else {
             if (strcmp(old_path, e->shorter_path[n_dest]) == 0) {
                 // Update shortest path if necessary
                 aux = findSecondShortest(e, n_origin, n_dest);
+                printf("%s <- %s\n", e->shorter_path[n_dest], e->routing[n_dest + 1][aux]);
                 strcpy(e->shorter_path[n_dest], e->routing[n_dest + 1][aux]);
                 sprintf(e->forwarding[n_dest], "%d", aux);
                 return 1; // Shortest path updated
@@ -215,8 +220,10 @@ int addPath(Encaminhamento *e, char *self, char *origin, char *dest, char *path)
                 return 0; // No change in shortest path
             } else {
                 // Set new path as the shortest path
+                printf("%s <-", e->shorter_path[n_dest]);
                 sprintf(e->shorter_path[n_dest], "%d-%s", n_self, path);
                 sprintf(e->forwarding[n_dest], "%d", n_origin);
+                printf(" %s\n", e->shorter_path[n_dest]);
                 return 1; // New path added
             }
         }
@@ -225,10 +232,12 @@ int addPath(Encaminhamento *e, char *self, char *origin, char *dest, char *path)
         if (strcmp(e->shorter_path[n_dest], e->routing[n_dest + 1][n_origin]) == 0) {
             strcpy(e->routing[n_dest + 1][n_origin], "-"); // Remove the path
             if ((aux = findSecondShortest(e, n_origin, n_dest)) == -1) {
+                printf("%s <- null\n", e->shorter_path[n_dest]);
                 strcpy(e->shorter_path[n_dest], "");
                 strcpy(e->forwarding[n_dest], "");
                 return 1; // No alternate path available
             } else {
+                printf("%s <- %s\n", e->shorter_path[n_dest], e->routing[n_dest + 1][aux]);
                 strcpy(e->shorter_path[n_dest], e->routing[n_dest + 1][aux]);
                 sprintf(e->forwarding[n_dest], "%d", aux);
                 return 1; // Alternate path set
@@ -245,6 +254,7 @@ int *removeAdj(Encaminhamento *e, char *node) {
     int i, n_node = atoi(node);
     int *updated_paths = (int *)calloc(100, sizeof(int)), n_updated = 0, aux;
 
+    printf("Removed Adj: %s\n", node);
     // Iterate through routing table and update paths affected by the removed node
     for (i = 0; i < 101; i++) {
         if (i > 0) {
@@ -252,10 +262,12 @@ int *removeAdj(Encaminhamento *e, char *node) {
                 if (strcmp(e->shorter_path[i - 1], e->routing[i][n_node]) == 0) {
                     strcpy(e->routing[i][n_node], "-"); // Remove the path
                     if ((aux = findSecondShortest(e, n_node, i - 1)) == -1) {
+                        printf("%s <- null\n", e->shorter_path[i - 1]);
                         strcpy(e->shorter_path[i - 1], "");
                         strcpy(e->forwarding[i - 1], "");
                         updated_paths[n_updated++] = i - 1;
                     } else {
+                        printf("%s <- %s\n", e->shorter_path[i - 1], e->routing[i][aux]);
                         strcpy(e->shorter_path[i - 1], e->routing[i][aux]);
                         sprintf(e->forwarding[i - 1], "%d", aux);
                         updated_paths[n_updated++] = i - 1;
