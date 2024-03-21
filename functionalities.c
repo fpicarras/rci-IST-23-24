@@ -467,7 +467,7 @@ void messageHANDLER(Nodes *n, char *msg){
         sprintf(message, "Node [%s] is no longer in the ring...", dest);
         sprintf(buffer, "CHAT %s %s %s\n", n->selfID, origin, message);
         messageHANDLER(n, buffer);
-    }else if(strcmp(dest, n->selfID) == 0){
+    }else if(n_dest == atoi (n->selfID)){
         //We are the destination for the message
         printf("[%s]: %s\n", origin, message);
     }else {
@@ -885,7 +885,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
         else if (strcmp(command, "m") == 0) {
             if(connected){ 
                 if (sscanf(str + 2, "%s", arg1) == 1){
-                    if (sscanf(str + 5, "%[^\n]", message) != 1) return 0;
+                    if (sscanf(str + 3 + strlen(arg1), "%[^\n]", message) != 1) return 0;
                     if (strcmp (arg1, n->selfID) == 0) printf ("%s\n\n", message);
                     else {
                         sprintf(buffer, "CHAT %s %s %s\n", n->selfID, arg1, message);
