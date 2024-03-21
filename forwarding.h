@@ -32,24 +32,34 @@ void deleteEncaminhamento(Encaminhamento* e);
  * @brief Prints the forwarding table
  * 
  * @param e Encaminhamento struct
+ * @param n String with the node
  */
-void Showforwarding(Encaminhamento *e);
+void Showforwarding(Encaminhamento *e, char *n);
 
 /**
  * @brief Prints the shortest path to n_dest
  * 
  * @param e Encaminhamento struct
- * @param n_dest Destination Node
+ * @param n Destination Node
  */
-void ShowPath(Encaminhamento *e, int n_dest);
+void ShowPath(Encaminhamento *e, int n_dest, char* origin);
+
+/**
+ * @brief Prints the shortest path to all nodes
+ * 
+ * @param e Encaminhamento struct
+ * @param origin Origin Node
+ */
+void ShowAllPaths(Encaminhamento *e, char* origin);
 
 /**
  * @brief Prints the routing table to n_dest
  * 
  * @param e Encaminhamento struct
  * @param n_dest Destination node
+ * @param origin Origin Node
  */
-void ShowRouting(Encaminhamento *e, int n_dest);
+void ShowRouting(Encaminhamento *e, int n_dest, char* origin);
 
 /**
  * @brief Given a path (format: N1-N2-N3) adds it to the routing data structures if it is valid.

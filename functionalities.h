@@ -6,7 +6,7 @@
 #define FUNC_H_
 
 #define TIME_OUT 15
-#define UDP_TIME_OUT 5
+#define UDP_TIME_OUT 2
 #define UDP_ATTEMPTS 3
 
 static volatile int loop = 1;
@@ -46,8 +46,6 @@ typedef struct _nodes{
     Chord *c;
 
 }Nodes;
-
-void sigHandler(int sig);
 
 /**
  * @brief Validates the lauch arguments that the user inserted, the user is free to use regIP and regUDP or not.

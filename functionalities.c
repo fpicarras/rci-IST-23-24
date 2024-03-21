@@ -467,9 +467,10 @@ void messageHANDLER(Nodes *n, char *msg){
         sprintf(message, "Node [%s] is no longer in the ring...", dest);
         sprintf(buffer, "CHAT %s %s %s\n", n->selfID, origin, message);
         messageHANDLER(n, buffer);
-    }else if(n_dest == atoi (n->selfID)){
+    } else if (n_dest == atoi (n->selfID)){
         //We are the destination for the message
-        printf("[%s]: %s\n", origin, message);
+        printf ("\n\n    MESSAGE FROM %s\n\n\n", origin);
+        printf(" %s\n\n\n", message);
     }else {
         //Forward this message
         if(atoi(e->forwarding[n_dest])==atoi(n->predID)) Send(n->predSOCK, msg);
@@ -789,9 +790,10 @@ int validateInput(char *s){
 
 int consoleInput(Socket *regSERV, Nodes *n, Select *s){
     char str[256], command[8], arg1[8], arg2[16], arg3[16], arg4[16], message[128], buffer[256];
-    int offset = 0;
+    int offset = 0, aux1 = 0;
     static int connected = 0;
     static char ring[] = "---";
+    Chord *aux = NULL;
 
     if(fgets(str, 100, stdin) == NULL) return 0;
 
@@ -851,19 +853,43 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
         // SHOW TOPOLOGY
         else if (strcmp(command, "st") == 0) {
             if(connected){
-                printf("NODE TOPOLOGY:\n\nRing: %s\n", ring);
-                printf("Pred: %s\n", n->predID);
-                printf("Self: %s [%s:%s]\n", n->selfID, n->selfIP, n->selfTCP);
-                printf("Succ: %s [%s:%s]\n", n->succID, n->succIP, n->succTCP);
-                printf("Ssucc: %s [%s:%s]\n", n->ssuccID, n->ssuccIP, n->ssuccTCP); 
-                printf("Chord: %s [%s:%s]\n\n", n->chordID, n->chordIP, n->chordTCP);
-            }else printf("Not connected...\n\n");         
+                printf("\n\n     TOPOLOGY\n\n");
+                printf (" ----------------- \n");
+                printf(" |  Ring  |  %s |\n", ring);
+                printf (" ----------------- \n");
+                printf(" |  Pred  |  %s  |\n", n->predID);
+                printf (" ----------------- \n");
+                printf(" | \e[1m Self \e[m | \e[1m %s \e[m |   [%s : %s]\n", n->selfID, n->selfIP, n->selfTCP);
+                printf (" ----------------- \n");
+                printf(" |  Succ  |  %s  |   [%s : %s]\n", n->succID, n->succIP, n->succTCP);
+                printf (" ----------------- \n");
+                printf(" |  Ssucc |  %s  |   [%s : %s]\n", n->ssuccID, n->ssuccIP, n->ssuccTCP); 
+                printf (" ----------------- \n");
+                if (strcmp (n->chordID, "") != 0){
+                    printf(" |  Chord |  %s  |   [%s : %s]\n", n->chordID, n->chordIP, n->chordTCP);
+                    printf (" ----------------- \n");
+                }
+                if (n->c != NULL){
+                    printf(" | Others Chords |");
+                    aux = n->c;
+                    while (aux != NULL){
+                        if (aux1 == 0){
+                            printf ("   %s ", aux->ID);
+                            aux1++;
+                        } else printf (" /  %s ", aux->ID);
+                        aux = aux->next;
+                    }
+                    printf ("\n ----------------- \n");
+                }
+                
+            } else printf("Not connected...\n");      
+            printf ("\n\n");   
         }
         // SHOW ROUTING [dest]
         else if (strcmp(command, "sr") == 0) {
             if(connected){
                 if (sscanf(str + offset, "%s", arg1) == 1){
-                    ShowRouting (e, atoi(arg1));
+                    ShowRouting (e, atoi(arg1), n->selfID);
                 } else printf("Invalid interface command!\n");
             } else printf("Not connected...\n\n");
         }
@@ -871,14 +897,15 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
         else if (strcmp(command, "sp") == 0) {
             if(connected){
                 if (sscanf(str + offset, "%s", arg1) == 1){
-                    ShowPath (e, atoi(arg1));
+                    if (strcmp(arg1, "all") == 0) ShowAllPaths (e, n->selfID);
+                    else ShowPath (e, atoi(arg1), n->selfID);
                 } else printf("Invalid interface command!\n");
             } else printf("Not connected...\n\n");  
         }
         // SHOW FORWARDING
         else if (strcmp(command, "sf") == 0) {          
             if(connected){      
-                Showforwarding (e); 
+                Showforwarding (e, n->selfID); 
             } else printf("Not connected...\n\n"); 
         }
         // MESSAGE [dest] [message]

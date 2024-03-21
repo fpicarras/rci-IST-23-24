@@ -61,57 +61,90 @@ void deleteEncaminhamento(Encaminhamento *e) {
 }
 
 // Shows the forwarding table of a node
-void Showforwarding(Encaminhamento *e) {
+void Showforwarding(Encaminhamento *e, char* n) {
     int i, aux = 0;
     char **forwarding = e->forwarding;
 
     for (i = 0; i < 100; i++) {
         if (strcmp(forwarding[i], "") == 0) // Empty entry in forwarding table
             continue;
-        if (aux == 0)
-            printf("forwarding Table:\n");
+        if (aux == 0){
+            printf("\n\n    %s FORWARDING TABLE\n\n", n);
+            printf (" --------------------------\n");
+            printf(" | Destination | Neighbor |\n");
+            printf (" --------------------------\n");
+        }
         aux++;
-        printf("Neighbor: %s, Destination: %02d \n", forwarding[i], i);
+        printf(" |     %02d      |    %02d    |\n", atoi(forwarding[i]), i);
+        printf (" --------------------------\n");
     }
-    if (aux <= 1)
-        printf("Is the only node in the ring!\n");
-    printf("\n");
+    if (aux == 0) printf("\n\n %s is the only node in the ring!\n", n);
+    printf("\n\n");
 }
 
 // Shows the shortest path from a node to a destination
-void ShowPath(Encaminhamento *e, int node) {
+void ShowPath(Encaminhamento *e, int dest, char* origin) {
     char **path = e->shorter_path;
-    if (strcmp(path[node], "") == 0) // No valid path exists for the destination
-        printf("Invalid destination, node %2d is not in the ring!\n", node);
-    else
-        printf("Shortest Path to Node %02d: %s\n", node, path[node]);
-    printf("\n");
+    
+    if (strcmp(path[dest], "") == 0) // No valid path exists for the destination
+        printf("\n\n Invalid destination! Node %02d is not in the ring!\n", dest);
+    else {
+        printf("\n\n    %s SHORTEST PATH TO %02d\n\n", origin, dest);
+        printf (" ------\n");
+        printf(" | %02d |   %s\n", dest, path[dest]);
+        printf (" ------\n");
+    }
+    printf("\n\n");
+}
+
+// Shows the all shortest path from a node to a destination
+void ShowAllPaths(Encaminhamento *e, char* origin){
+    char **path = e->shorter_path;
+    int i, aux = 0, flag = 0;
+
+    for (i = 0; i < 100; i++) {
+        if (strcmp(path[i], "") == 0) // Empty entry in forwarding table
+            continue;
+        if (aux == 0){
+            printf("\n\n    %s SHORTEST PATH TO ALL NODES\n\n", origin);
+        }
+        printf (" ------\n");
+        printf(" | %02d |   %s\n", i, path[i]);
+        flag = 1;
+        aux++;
+    }
+    if (flag == 1) printf (" ------\n");
+    if (aux == 0) printf("\n\n %s is the only node in the ring!\n", origin);
+    printf("\n\n");
 }
 
 // Shows the routing table entry of a node relative to a destination
-void ShowRouting(Encaminhamento *e, int node) {
-    int i, aux = 0;
+void ShowRouting(Encaminhamento *e, int dest, char *origin) {
+    int i, aux = 0, flag = 0;
     char ***routing = e->routing;
 
     // Check if the destination node exists in the ring
     for (i = 0; i < 100; i++) {
-        if (strcmp(routing[0][i], "") == 0)
-            aux++;
+        if (strcmp(routing[0][i], "") == 0) aux++;
     }
 
     if (aux == 100) {
-        printf("Invalid destination, node %02d is not in the ring!\n\n", node);
-        return;
+        printf("\n\n Invalid destination! Node %02d is not in the ring!\n", dest);
+    } else {
+        if (dest == atoi(origin)) printf ("\n\n Current node!\n");
+        else {
+            // Display routing table entries for the destination node
+            printf("\n\n    %s ROUTING TABLE TO %02d\n\n", origin, dest);   
+            for (i = 0; i < 100; i++) {
+                if (strcmp(routing[dest + 1][i], "-") == 0) continue;
+                printf (" ------\n");
+                printf(" | %02d |   %s\n", i, routing[dest + 1][i]);
+                flag = 1;
+            }
+            if (flag == 1) printf (" ------\n");
+        }
     }
-
-    // Display routing table entries for the destination node
-    printf("Routing Table: \n");
-    for (i = 0; i < 100; i++) {
-        if (strcmp(routing[node + 1][i], "-") == 0)
-            continue;
-        printf("Path to %02d by %02d: %s\n", node, i, routing[node + 1][i]);
-    }
-    printf("\n");
+    printf("\n\n");
 }
 
 // Checks if the given path is valid
