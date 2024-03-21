@@ -127,6 +127,10 @@ void isNodeInServer(char *nodeslist, char *selfID){
         while(sscanf(aux, "%s %s %s", succID, succIP, succTCP)==3){
             if(strcmp(id, succID)==0){
                 available = 0;
+                if(id[0]=='9' && id[1]=='9'){
+                    strcpy(id, "00");
+                    break;
+                }
                 i = (id[0]-48)*10 + (id[1]-48);
                 i++;
                 id[0] = (i%100 - i%10)/10 + 48;
@@ -390,6 +394,7 @@ int join(Socket *regSERV, Nodes *n, Select *sel, char *ring, char *suc){
     
     // Ensures that our id is unique, if it isn't we try to get a new one
     isNodeInServer(aux, n->selfID);
+    e = initEncaminhamento(n->selfID);
     
     // Skip NODESLIST
     if(sscanf(aux+14, "%s %s %s", succID, succIP, succTCP)!=3){
@@ -800,7 +805,6 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
             }
             if (sscanf(str + offset, "%s %s %s", arg1, arg2, arg3) == 3){
                 strcpy(n->selfID, arg2); strcpy(ring, arg1);
-                e = initEncaminhamento(n->selfID);
                 if(join(regSERV, n, s, ring, arg3)){
                     if(registerInServer(regSERV, ring, n)) connected = 1;
                 }else{
@@ -808,7 +812,6 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                 }
             } else if (sscanf(str + offset, "%s %s", arg1, arg2) == 2){
                 strcpy(n->selfID, arg2); strcpy(ring, arg1);
-                e = initEncaminhamento(n->selfID);
                 if(join(regSERV, n, s, ring, NULL)){
                     if(registerInServer(regSERV, ring, n)) connected = 1;
                 }else {
@@ -827,7 +830,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                 e = initEncaminhamento(n->selfID);
                 if(directJoin(n, s, arg2, arg3, arg4)){
                     connected = 1;
-                }
+                }else deleteEncaminhamento(e);
             } else printf("Invalid interface command!\n");
         }
         // CHORD

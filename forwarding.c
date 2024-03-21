@@ -39,7 +39,7 @@ Encaminhamento *initEncaminhamento(char *self) {
 // Deletes forwarding tables and frees memory
 void deleteEncaminhamento(Encaminhamento *e) {
     int i, j;
-
+    if(e == NULL) return;
     // Free memory allocated for routing table
     for (i = 0; i < 101; i++) {
         for (j = 0; j < 100; j++)
