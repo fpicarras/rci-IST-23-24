@@ -60,7 +60,6 @@ int main(int argc, char *argv[]) {
             if ((n->succSOCK != NULL) && checkFD(s, getFD_Socket(n->succSOCK))) {
                 if (Recieve(n->succSOCK, buffer) == 0) {
                     // Successor disconnected
-                    printf("\n Succ disconnected!\n\n");
                     handleSuccDisconnect(n, s);
                 } else {
                     // Handle remaining commands from successor

@@ -522,20 +522,20 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
 
     // Check if the provided IP matches the actual IP of the new node
     if(strcmp(newIP, aux_ip) != 0){
-        printf("\n New connection announced a different IP from its own...\nDisconnecting from them...\n\n");
-        closeSocket(new_node, 1);
-        if (aux_ip != NULL) free (aux_ip);
-        //return;
-    }
-
-    // Check if the new node has the same ID as the current node
-    if(strcmp(newID, n->selfID) == 0){
-        printf("\n New connection trying the same ID...\nDisconnecting from them...\n\n");
+        printf("\n New connection announced a different IP from its own...\n Disconnecting from them...\n\n");
         closeSocket(new_node, 1);
         if (aux_ip != NULL) free (aux_ip);
         return;
     }
-    //if (aux_ip != NULL) free (aux_ip);
+
+    // Check if the new node has the same ID as the current node
+    if(strcmp(newID, n->selfID) == 0){
+        printf("\n New connection trying the same ID...\n Disconnecting from them...\n\n");
+        closeSocket(new_node, 1);
+        if (aux_ip != NULL) free (aux_ip);
+        return;
+    }
+    if (aux_ip != NULL) free (aux_ip);
     // We are alone in the ring
     if(strcmp(n->succID, n->selfID) == 0){
         // Set the new node as predecessor and successor
@@ -547,7 +547,7 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
         Send(new_node, buffer);
 
         // Set the current node as successor of the new node
-        sleep(20);
+        //sleep(20);
         n->succSOCK = TCPSocket(newIP, newTCP);
         if(n->succSOCK == NULL){
             printf("[!] Error Connecting to Successor...\n");
@@ -725,7 +725,6 @@ void handleChordsDisconnect(Nodes *n, Select *s, Chord* c){
     removeFD(s, getFD_Socket(c->s));
 
     // Handle routing information for the disconnected chord
-    printf ("%s\n\n", c->ID);
     aux = removeAdj (e, c->ID);
 
     // Remove the chord node from the chord list
@@ -965,7 +964,8 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
             if(connected){      
                 // Handle chord removal
                 if (strcmp (n->chordID, "") != 0){
-                    handleOurChordDisconnect(n, s);                  
+                    handleOurChordDisconnect(n, s);  
+                    printf ("\n Chord removed!\n\n");                
                 } else printf("\n Not connected by chord...\n\n");  
             } else printf("\n Not connected...\n\n");            
         }
@@ -1103,14 +1103,14 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
                 n->c = NULL;
                 deleteEncaminhamento(e);
                 connected = 0;
-            } else printf("\n Not connected...\n\n");  
+            }
             return 1;             
         }
         // Clear
         else if(strcmp(command, "clear") == 0){
             if(sscanf(str+6, "%s", arg1)){
                 // Validate ring command
-                if (strlen(arg1) == 3 && atoi(arg1) >= 0 && atoi(arg1) <= 99){
+                if (strlen(arg1) == 3 && atoi(arg1) >= 0 && atoi(arg1) <= 999){
                     int attempts = 0;
                     char buffer[32];
                     Select *udp_t = newSelect();
@@ -1137,7 +1137,7 @@ int consoleInput(Socket *regSERV, Nodes *n, Select *s){
         else if(strcmp(command, "nodes") == 0){
             if(sscanf(str+6, "%s", arg1)){
                 // Validate ring command
-                if (strlen(arg1) == 3 && atoi(arg1) >= 0 && atoi(arg1) <= 99){
+                if (strlen(arg1) == 3 && atoi(arg1) >= 0 && atoi(arg1) <= 999){
                     char *aux = getNodesServer(regSERV, arg1);
                     if (aux == NULL){
                         printf("\n Failed to get Nodes from server...\n\n");
