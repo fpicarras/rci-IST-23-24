@@ -290,7 +290,7 @@ int *removeAdj(Encaminhamento *e, char *node) {
     int i, n_node = atoi(node);
     int *updated_paths = (int *)calloc(100, sizeof(int)), n_updated = 0, aux;
 
-    printf("\nRemoved Adj: %s\n\n", node);
+    //printf("\nRemoved Adj: %s\n\n", node);
     // Iterate through routing table and update paths affected by the removed node
     for (i = 0; i < 101; i++) {
         if (i > 0) {

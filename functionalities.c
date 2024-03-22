@@ -275,6 +275,24 @@ void createCHORD(Nodes *n, Select *s, Socket *server, char *ring, char *target){
     } else printf ("\n Less than 4 nodes in the ring...\n\n"); // Only 3 nodes exist in the ring
 }
 
+void fullDisconnect(Nodes *n, Select *s){
+    if(n->predSOCK != NULL){
+        removeFD(s, getFD_Socket(n->predSOCK));
+        closeSocket(n->predSOCK, 1);
+        n->predSOCK = NULL;
+    }
+    if(n->succSOCK != NULL){
+        removeFD(s, getFD_Socket(n->succSOCK));
+        closeSocket(n->succSOCK, 1);
+        n->succSOCK = NULL;
+    }
+    if (strcmp (n->chordID, "") != 0){
+        removeFD(s, getFD_Socket(n->chordSOCK)); closeSocket(n->chordSOCK, 1);
+        n->chordSOCK = NULL;
+    }
+    deleteALLChords(n->c, s);
+}
+
 // Function to directly join a ring by connecting to the successor node and waiting for the predecessor to connect
 int directJoin(Nodes *n, Select *sel, char *succID, char *succIP, char *succTCP){
     // Allocate memory for buffer
@@ -507,7 +525,7 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
         printf("\n New connection announced a different IP from its own...\nDisconnecting from them...\n\n");
         closeSocket(new_node, 1);
         if (aux_ip != NULL) free (aux_ip);
-        return;
+        //return;
     }
 
     // Check if the new node has the same ID as the current node
@@ -517,8 +535,8 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
         if (aux_ip != NULL) free (aux_ip);
         return;
     }
-    if (aux_ip != NULL) free (aux_ip);
-    // Handle the case when the successor ID is the same as the current node's ID
+    //if (aux_ip != NULL) free (aux_ip);
+    // We are alone in the ring
     if(strcmp(n->succID, n->selfID) == 0){
         // Set the new node as predecessor and successor
         strcpy(n->predID, newID); n->predSOCK = new_node;
@@ -529,7 +547,13 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
         Send(new_node, buffer);
 
         // Set the current node as successor of the new node
+        sleep(20);
         n->succSOCK = TCPSocket(newIP, newTCP);
+        if(n->succSOCK == NULL){
+            printf("[!] Error Connecting to Successor...\n");
+            fullDisconnect(n, s);
+            exit(0);
+        }
         sprintf(buffer, "PRED %s\n", n->selfID);
         Send(n->succSOCK, buffer);
         strcpy(n->succID, newID); strcpy(n->succIP, newIP); strcpy(n->succTCP, newTCP);
@@ -597,6 +621,11 @@ void handleSuccDisconnect(Nodes *n, Select *s){
 
         // Establish connection with the secondary successor
         new = TCPSocket(n->ssuccIP, n->ssuccTCP);
+        if(new == NULL){
+            printf("[!] Error Connecting to Successor...\n");
+            fullDisconnect(n, s);
+            exit(0);
+        }
         strcpy(n->succID, n->ssuccID); strcpy(n->succIP, n->ssuccIP); strcpy(n->succTCP, n->ssuccTCP);
         n->succSOCK = new; addFD(s, getFD_Socket(new));
         sprintf(buffer, "PRED %s\n", n->selfID);
@@ -752,6 +781,12 @@ void handleSuccCommands(Nodes *n, Select *s, char *msg){
             strcpy(n->succID, auxID); strcpy(n->succIP, auxIP); strcpy(n->succTCP, auxTCP);
             sprintf(buffer, "PRED %s\n", n->selfID);
             new = TCPSocket(auxIP, auxTCP);
+            if(new == NULL){
+                printf("[!] Error Connecting to Successor...\n");
+                fullDisconnect(n, s);
+                exit(0);
+            }
+
             addFD(s, getFD_Socket(new)); n->succSOCK = new;
             Send(new, buffer);
 
@@ -784,6 +819,7 @@ void handlePredCommands(Nodes *n, Select *s, char *msg){
         }
     }
 }
+
 // Handles a new connection received by the server. Parses the incoming message and takes appropriate actions based on the command received.
 void handleNewConnection(Nodes *n, Select *s, Chord **c_head, Socket *new, char *msg){
     char buffer[BUFFER_SIZE], command[16];
