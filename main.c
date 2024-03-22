@@ -6,7 +6,7 @@
 #define REGUDP "59000"
 
 // Set to 1 to see the messages received, 0 not to
-#define VERBOSE 0
+#define VERBOSE 1
 
 int main(int argc, char *argv[]) {
     char IP[16], TCP[6], buffer[BUFFER_SIZE];

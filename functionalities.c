@@ -136,7 +136,7 @@ void isNodeInServer(char *nodeslist, char *selfID){
         }
         if(available) break;
     }
-    printf("\n Id choosen: %s\n\n", id);
+    printf("Id choosen: %s\n", id);
     strcpy(selfID, id); // Update selfID with the chosen ID
     return;
 }
@@ -218,8 +218,8 @@ void createCHORD(Nodes *n, Select *s, Socket *server, char *ring, char *target){
     char *aux = NULL, *aux1 = NULL;
     int flag = 0;
 
-    if (strcmp (n->predID, n->ssuccID) != 0){ // More than 3 nodes exist
-        if (strcmp (n->chordID, "") == 0){ // Node is not already part of a chord
+    if (!(strcmp(n->predID, n->ssuccID) == 0 || strcmp(n->predID, n->succID) == 0)){ // More than 3 nodes exist
+         if (strcmp (n->chordID, "") == 0){ // Node is not already part of a chord
             aux = getNodesServer(server, ring);
             if (aux == NULL){
                 printf("\n Failed to get Nodes from server...\n\n");
@@ -470,8 +470,7 @@ void messageHANDLER(Nodes *n, char *msg){
         messageHANDLER(n, buffer);
     } else if (n_dest == atoi (n->selfID)){
         // Print the message locally if the node is the destination
-        printf ("\n\n    MESSAGE FROM %s\n\n\n", origin);
-        printf(" %s\n\n\n", message);
+        printf("[%s] %s\n", origin, message);
     }else {
         // Forward the message to the appropriate node
         if(atoi(e->forwarding[n_dest]) == atoi(n->predID)) Send(n->predSOCK, msg);
@@ -645,12 +644,12 @@ void handlePredDisconnect(Nodes *n, Select *s){
         
         addFD(s, getFD_Socket(n->predSOCK)); // Add the new predecessor's socket to the select structure
 
-        // Send our paths to the new predecessor
-        sendAllPaths(n->predSOCK, n->selfID);
-
         // Send successor information to the new predecessor
         sprintf(buffer, "SUCC %s %s %s\n", n->succID, n->succIP, n->succTCP);
         Send(n->predSOCK, buffer);
+
+        // Send our paths to the new predecessor
+        sendAllPaths(n->predSOCK, n->selfID);
     }
 }
 
@@ -688,11 +687,11 @@ void handleChordsDisconnect(Nodes *n, Select *s, Chord* c){
     // Remove chord's socket from the select structure
     removeFD(s, getFD_Socket(c->s));
 
-    // Remove the chord node from the chord list
-    n->c = deleteChord(n->c, c->ID);
-
     // Handle routing information for the disconnected chord
     aux = removeAdj (e, c->ID);
+
+    // Remove the chord node from the chord list
+    n->c = deleteChord(n->c, c->ID);
     for(int i = 0; aux != NULL && aux[i] != -1; i++){
         if(strcmp(e->shorter_path[aux[i]], "")==0){
             sprintf(buffer, "ROUTE %d %d\n", atoi(n->selfID), aux[i]);
@@ -806,6 +805,9 @@ void handleNewConnection(Nodes *n, Select *s, Chord **c_head, Socket *new, char 
             // Send our successor information to the new neighbor
             sprintf(buffer, "SUCC %s %s %s\n", n->succID, n->succIP, n->succTCP);
             Send(new, buffer);
+
+            // Send our paths to the new neighbor
+            sendAllPaths(new, n->selfID);
         }
         // Handle the CHORD command
         if(strcmp(command, "CHORD")==0){

@@ -143,7 +143,7 @@ int Send(Socket *sock, char *message){
     if(sock->type == 2){
         int n = sendto(sock->fd, buffer, BUFFER_SIZE, 0, sock->res->ai_addr, sock->res->ai_addrlen);
         if(n == -1){
-            printf("\n Error Sending message: %s...\n\n", message);
+            printf("[!] Error Sending message: %s...\n\n", message);
             return 0;
         }
     }else if(sock->type == 1){
@@ -153,7 +153,7 @@ int Send(Socket *sock, char *message){
         while(nleft>0){
             nwritten = write(sock->fd, ptr, nleft);
             if(nwritten < 0){
-                printf("\n Error sending message: %s\n\n", message);
+                printf("[!] Error sending message: %s...\n\n", message);
                 return 0;
             }
             nleft -= nwritten; ptr += nwritten;
@@ -177,7 +177,7 @@ int Recieve(Socket *sock, char *buffer){
         int n = recvfrom(sock->fd, buffer, BUFFER_SIZE, 0, &addr, &addrlen);
 
         if(n == -1){
-            printf("\n Error receiving...\n\n");
+            printf("[!] Error receiving...\n\n");
             return -1;
         }
         buffer[n] = '\0';
@@ -195,6 +195,7 @@ int Recieve(Socket *sock, char *buffer){
             ptr += nread;
         }
         ptr[1] = '\0';
+        if(nread == -1) printf("[!] Error receiving...\n\n");
         return nread;
     }
     return -1;
