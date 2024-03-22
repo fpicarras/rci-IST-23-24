@@ -219,7 +219,7 @@ void createCHORD(Nodes *n, Select *s, Socket *server, char *ring, char *target){
     int flag = 0;
 
     if (!(strcmp(n->predID, n->ssuccID) == 0 || strcmp(n->predID, n->succID) == 0)){ // More than 3 nodes exist
-         if (strcmp (n->chordID, "") == 0){ // Node is not already part of a chord
+         if (strcmp (n->chordID, "") == 0){ // Node don't have already a chord
             aux = getNodesServer(server, ring);
             if (aux == NULL){
                 printf("\n Failed to get Nodes from server...\n\n");
@@ -228,7 +228,7 @@ void createCHORD(Nodes *n, Select *s, Socket *server, char *ring, char *target){
             }
             aux1 = aux + 14;
             // Iterate through nodes received from the server
-            while(sscanf(aux1, "%s %s %s", ID, IP, TCP)==3){
+            while(sscanf(aux1, "%s %s %s\n", ID, IP, TCP)==3){
                 if (e->routing[0][atoi(ID)][0] == '\0'){ // Check if the node is not already in the routing table
                     // If a target node is specified, only try to connect to it
                     if(target != NULL){
@@ -236,34 +236,40 @@ void createCHORD(Nodes *n, Select *s, Socket *server, char *ring, char *target){
                             flag = 1;
                             break;
                         }
+                    } else {
+                        flag = 1;
+                        break;
                     }
                 }
                 aux1 += 3+strlen(ID)+strlen(IP)+strlen(TCP);
             }
             if (flag == 0){
                 aux1 = aux + 14;
-                while(sscanf(aux1, "%s %s %s", ID, IP, TCP)==3){
+                while(sscanf(aux1, "%s %s %s\n", ID, IP, TCP)==3){
                     if (e->routing[0][atoi(ID)][0] == '\0'){
-                        if (target != NULL) printf ("\n Node %s is not resgistred in server!\n\n", target);
+                        printf ("\n Node %s is not resgistred in server!\n\n", target);
+                        flag = 1;
                         break;
                     }
                     aux1 += 3+strlen(ID)+strlen(IP)+strlen(TCP);
                 }
             }
-            printf ("\n Your chord is %s!\n\n", ID);
-            n->chordSOCK = TCPSocket(IP, TCP);
-            if(n->chordSOCK == NULL){
-                printf("\n Unable to connect to target node %s\n\n", ID);
-                free(aux);
-                return;
-            }
-            // If connection is successful, update node's information and send the ENTRY command
-            addFD(s, getFD_Socket(n->chordSOCK));
-            strcpy(n->chordID, ID); strcpy(n->chordIP, IP); strcpy(n->chordTCP, TCP);
-            sprintf(buffer, "CHORD %s\n", n->selfID);
-            Send(n->chordSOCK, buffer); // Send ENTRY command to the target node
-            addFD(s, getFD_Socket(n->chordSOCK)); // Wait for response
-            sendAllPaths(n->chordSOCK, n->selfID); // Send all paths to the newly connected node
+            if (flag == 1){
+                printf ("\n Your chord is %s!\n\n", ID);
+                n->chordSOCK = TCPSocket(IP, TCP);
+                if(n->chordSOCK == NULL){
+                    printf("\n Unable to connect to target node %s\n\n", ID);
+                    free(aux);
+                    return;
+                }
+                // If connection is successful, update node's information and send the ENTRY command
+                addFD(s, getFD_Socket(n->chordSOCK));
+                strcpy(n->chordID, ID); strcpy(n->chordIP, IP); strcpy(n->chordTCP, TCP);
+                sprintf(buffer, "CHORD %s\n", n->selfID);
+                Send(n->chordSOCK, buffer); // Send ENTRY command to the target node
+                addFD(s, getFD_Socket(n->chordSOCK)); // Wait for response
+                sendAllPaths(n->chordSOCK, n->selfID); // Send all paths to the newly connected node
+            } else printf("\n Unable to establish a chord.\n\n");
             free(aux);
         } else printf ("\n Already in a chord ...\n\n"); // Node is already part of a chord
     } else printf ("\n Less than 4 nodes in the ring...\n\n"); // Only 3 nodes exist in the ring
@@ -500,6 +506,7 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
     if(strcmp(newIP, aux_ip) != 0){
         printf("\n New connection announced a different IP from its own...\nDisconnecting from them...\n\n");
         closeSocket(new_node, 1);
+        if (aux_ip != NULL) free (aux_ip);
         return;
     }
 
@@ -507,6 +514,7 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
     if(strcmp(newID, n->selfID) == 0){
         printf("\n New connection trying the same ID...\nDisconnecting from them...\n\n");
         closeSocket(new_node, 1);
+        if (aux_ip != NULL) free (aux_ip);
         return;
     }
 
@@ -560,6 +568,7 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
         // Send paths to the new predecessor
         sendAllPaths(n->predSOCK, n->selfID);
     }
+    if (aux_ip != NULL) free (aux_ip);
 }
 
 // Handles the disconnection of the successor node. Determines the appropriate actions to take based on the current network state.
@@ -688,6 +697,7 @@ void handleChordsDisconnect(Nodes *n, Select *s, Chord* c){
     removeFD(s, getFD_Socket(c->s));
 
     // Handle routing information for the disconnected chord
+    printf ("%s\n\n", c->ID);
     aux = removeAdj (e, c->ID);
 
     // Remove the chord node from the chord list

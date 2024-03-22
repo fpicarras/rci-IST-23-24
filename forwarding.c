@@ -75,7 +75,7 @@ void Showforwarding(Encaminhamento *e, char* n) {
             printf (" --------------------------\n");
         }
         aux++;
-        printf(" |     %02d      |    %02d    |\n", atoi(forwarding[i]), i);
+        printf(" |     %02d      |    %02d    |\n", i, atoi(forwarding[i]));
         printf (" --------------------------\n");
     }
     if (aux == 0) printf("\n\n %s is the only node in the ring!\n", n);
@@ -211,6 +211,7 @@ int addPath(Encaminhamento *e, char *self, char *origin, char *dest, char *path)
             strcpy(e->routing[n_dest + 1][n_origin], "-"); // Remove the path
             if ((aux = findSecondShortest(e, n_origin, n_dest)) == -1) {
                 //printf("%s <- null\n", e->shorter_path[n_dest]); *)#
+                e->routing[0][n_dest][0] = '\0';
                 strcpy(e->shorter_path[n_dest], "");
                 strcpy(e->forwarding[n_dest], "");
                 return 1; // No alternate path available
@@ -267,6 +268,7 @@ int addPath(Encaminhamento *e, char *self, char *origin, char *dest, char *path)
             strcpy(e->routing[n_dest + 1][n_origin], "-"); // Remove the path
             if ((aux = findSecondShortest(e, n_origin, n_dest)) == -1) {
                 //printf("%s <- null\n", e->shorter_path[n_dest]);  *)#
+                e->routing[0][n_dest][0] = '\0';
                 strcpy(e->shorter_path[n_dest], "");
                 strcpy(e->forwarding[n_dest], "");
                 return 1; // No alternate path available
@@ -288,7 +290,7 @@ int *removeAdj(Encaminhamento *e, char *node) {
     int i, n_node = atoi(node);
     int *updated_paths = (int *)calloc(100, sizeof(int)), n_updated = 0, aux;
 
-    printf("Removed Adj: %s\n", node);
+    printf("\nRemoved Adj: %s\n\n", node);
     // Iterate through routing table and update paths affected by the removed node
     for (i = 0; i < 101; i++) {
         if (i > 0) {

@@ -144,6 +144,7 @@ int Send(Socket *sock, char *message){
         int n = sendto(sock->fd, buffer, BUFFER_SIZE, 0, sock->res->ai_addr, sock->res->ai_addrlen);
         if(n == -1){
             printf("[!] Error Sending message: %s...\n\n", message);
+            free(buffer);
             return 0;
         }
     }else if(sock->type == 1){
@@ -154,6 +155,7 @@ int Send(Socket *sock, char *message){
             nwritten = write(sock->fd, ptr, nleft);
             if(nwritten < 0){
                 printf("[!] Error sending message: %s...\n\n", message);
+                free(buffer);
                 return 0;
             }
             nleft -= nwritten; ptr += nwritten;
