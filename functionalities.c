@@ -547,7 +547,6 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
         Send(new_node, buffer);
 
         // Set the current node as successor of the new node
-        //sleep(20);
         n->succSOCK = TCPSocket(newIP, newTCP);
         if(n->succSOCK == NULL){
             printf("[!] Error Connecting to Successor...\n");
@@ -605,6 +604,7 @@ void handleSuccDisconnect(Nodes *n, Select *s){
     n->succSOCK = NULL;
 
     // Update adjacent nodes and broadcast the changes
+    if(strcmp(n->selfID, n->ssuccID) != 0 && strcmp(n->chordID, n->ssuccID) == 0) handleOurChordDisconnect(n, s);
     aux = removeAdj(e, n->succID);
     for(int i = 0; aux != NULL && aux[i] != -1; i++){
         if(strcmp(e->shorter_path[aux[i]], "")==0){
@@ -617,7 +617,7 @@ void handleSuccDisconnect(Nodes *n, Select *s){
     // If the secondary successor is available, connect to it
     if(strcmp(n->selfID, n->ssuccID) != 0){
         // If the secondary successor is connected via the chord, remove the chord
-        if(strcmp(n->chordID, n->ssuccID) == 0) handleOurChordDisconnect(n, s);
+        //if(strcmp(n->chordID, n->ssuccID) == 0) handleOurChordDisconnect(n, s);
 
         // Establish connection with the secondary successor
         new = TCPSocket(n->ssuccIP, n->ssuccTCP);

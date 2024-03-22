@@ -141,7 +141,7 @@ int Send(Socket *sock, char *message){
 
     //Is UDP
     if(sock->type == 2){
-        int n = sendto(sock->fd, buffer, strlen(message)+1, 0, sock->res->ai_addr, sock->res->ai_addrlen);
+        int n = sendto(sock->fd, buffer, BUFFER_SIZE, 0, sock->res->ai_addr, sock->res->ai_addrlen);
         if(n == -1){
             printf("[!] Error Sending message: %s...\n\n", message);
             free(buffer);
