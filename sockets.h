@@ -29,6 +29,13 @@ typedef struct _socket Socket;
  */
 int check_ipv4 (char *IP);
 
+/**
+ * @brief Function to print the address of a socket.
+ * 
+ * @param sock Socket*, pointer to a struct Socket representing a socket.
+ * @return char* -> Pointer to a character array containing the IP address of the socket. If the socket's address
+ *         resolution information is available, it returns the IP address. Otherwise, it returns NULL.
+ */
 char *getAddress(Socket* sock);
 
 /**

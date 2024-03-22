@@ -11,41 +11,49 @@
 
 static volatile int loop = 1;
 
-typedef struct _chords_struct{
-    Socket *s;
-    char ID[4];
-    struct _chords_struct *next;
-}Chord;
+typedef struct _chords_struct {
+    Socket *s;            // Pointer to a socket
+    char ID[4];           // ID of the chord (assuming it's a string of length 3 plus '\0')
+    struct _chords_struct *next;  // Pointer to the next Chord structure in the linked list
+} Chord;
 
 typedef struct _nodes{
+    // Self node information
     char selfID[3];
     char selfIP[16];
     char selfTCP[6];
     Socket *selfSOCK;
 
+    // Successor node information
     char succID[3];
     char succIP[16];
     char succTCP[6];
     Socket *succSOCK;
 
+    // Second successor node information
     char ssuccID[3];
     char ssuccIP[16];
     char ssuccTCP[6];
 
+    // Predecessor node information
     char predID[3];
     Socket *predSOCK;
 
+    // Chord information
     char chordID[3];
     char chordIP[16];
     char chordTCP[6];
     Socket *chordSOCK;
 
+    // Possible predecessor information
     char possible_predID[3];
     Socket *possible_predSOCK;
 
+    // Pointer to chord structure
     Chord *c;
 
-}Nodes;
+} Nodes; // Structure definition ends here
+
 
 /**
  * @brief Validates the lauch arguments that the user inserted, the user is free to use regIP and regUDP or not.
@@ -108,8 +116,23 @@ void handlePredCommands(Nodes *n, Select *s, char *msg);
  */
 void handlePredDisconnect(Nodes *n, Select *s);
 
+/**
+ * @brief Handles the disconnection of a chord node by removing its socket from the select structure,
+   updating the node's chord list, and handling routing information accordingly.
+ * 
+ * @param n Pointer to a struct Nodes representing the network node.
+ * @param s Pointer to a struct Select representing the select structure.
+ * @param c Pointer to a struct Chord representing the chord node to be disconnected.
+ */
 void handleChordsDisconnect(Nodes *n, Select *s, Chord* c);
 
+/**
+ * @brief Handles the disconnection of the node's own chord by removing its socket from the select structure,
+   closing the socket, and updating the node's chord information.
+ * 
+ * @param n Pointer to a struct Nodes representing the network node.
+ * @param s Pointer to a struct Select representing the select structure.
+ */
 void handleOurChordDisconnect(Nodes *n, Select *s);
 
 /**

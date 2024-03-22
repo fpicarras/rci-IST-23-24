@@ -23,7 +23,7 @@ int check_ipv4 (char *IP){
     struct in_addr dest;
     
     if (inet_pton(AF_INET, IP, &dest) == 0){
-        printf ("%s is not a valid IPv4 address!\n", IP);
+        printf ("\n %s is not a valid IPv4 address!\n\n", IP);
         return 1;
     }
     return 0;
@@ -80,7 +80,7 @@ void hostName(char *s){
     if(gethostname(buffer, BUFFER_SIZE) == -1)
         fprintf(stderr, "Error: %s\n", strerror(errno));
     else 
-        printf("Host name: %s\n", buffer);
+        printf("\n Host name: %s\n\n", buffer);
 
     if(s != NULL) sprintf(s, "%s", buffer); // Storing hostname if provided.
 }
@@ -100,7 +100,7 @@ char *getAddress(Socket* sock){
     for(p = sock->res; p != NULL; p = p->ai_next){
         struct sockaddr_in *ip = (struct sockaddr_in *)p->ai_addr;
         addr = &(ip->sin_addr);
-        printf("%s\n", inet_ntop(p->ai_family, addr, buffer, sizeof(buffer)));
+        printf("\n %s\n\n", inet_ntop(p->ai_family, addr, buffer, sizeof(buffer)));
     }
     free(buffer);
     return NULL;
@@ -126,7 +126,7 @@ Socket *TCPSocket(char *node, char *service){
 
     n = connect(new->fd, new->res->ai_addr, new->res->ai_addrlen);
     if(n == -1){
-        printf("Error connecting to %s...\n", new->res->ai_canonname);
+        printf("\n Error connecting to %s...\n\n", new->res->ai_canonname);
         closeSocket(new, 1);
         return NULL;
     }
@@ -143,7 +143,7 @@ int Send(Socket *sock, char *message){
     if(sock->type == 2){
         int n = sendto(sock->fd, buffer, BUFFER_SIZE, 0, sock->res->ai_addr, sock->res->ai_addrlen);
         if(n == -1){
-            printf("Error Sending message: %s...\n", message);
+            printf("\n Error Sending message: %s...\n\n", message);
             return 0;
         }
     }else if(sock->type == 1){
@@ -153,7 +153,7 @@ int Send(Socket *sock, char *message){
         while(nleft>0){
             nwritten = write(sock->fd, ptr, nleft);
             if(nwritten < 0){
-                printf("Error sending message: %s\n", message);
+                printf("\n Error sending message: %s\n\n", message);
                 return 0;
             }
             nleft -= nwritten; ptr += nwritten;
@@ -177,7 +177,7 @@ int Recieve(Socket *sock, char *buffer){
         int n = recvfrom(sock->fd, buffer, BUFFER_SIZE, 0, &addr, &addrlen);
 
         if(n == -1){
-            printf("Error receiving...\n");
+            printf("\n Error receiving...\n\n");
             return -1;
         }
         buffer[n] = '\0';
@@ -211,7 +211,7 @@ Socket *UDPserverSocket(char *service){
     Socket *new = initSocket(AF_INET, SOCK_DGRAM, 0, AI_PASSIVE, NULL, service);
 
     if(bind(new->fd, new->res->ai_addr, new->res->ai_addrlen)==-1){
-        printf("Error binding port!\n"); 
+        printf("\n Error binding port!\n\n"); 
         closeSocket(new, 1);
         return NULL;
     }
@@ -222,7 +222,7 @@ Socket *UDPserverSocket(char *service){
 void UDPserverRecieve(Socket *sock, struct sockaddr *addr, char *buffer){
     socklen_t addrlen = sizeof(*addr);
     if(recvfrom(sock->fd, buffer, BUFFER_SIZE, 0, addr, &addrlen)==-1)
-        printf("Error receiving...\n");
+        printf("\n Error receiving...\n\n");
 }
 
 // Function to send data from a UDP server socket.
@@ -231,7 +231,7 @@ int UDPserverSend(Socket *sock, struct sockaddr *addr, char *message){
     strcpy(buffer, message);
     socklen_t addrlen = sizeof(*addr);
     if(sendto(sock->fd, buffer, BUFFER_SIZE, 0, addr, addrlen)==-1){
-        printf("Error sending...\n");
+        printf("\n Error sending...\n\n");
         return 0;
     }
 
@@ -250,12 +250,12 @@ Socket *TCPserverSocket(char *service, int queue_size){
 
     Socket *new = initSocket(AF_INET, SOCK_STREAM, 0, AI_PASSIVE, NULL, service);
     if(bind(new->fd, new->res->ai_addr, new->res->ai_addrlen)==-1){
-        printf("Error binding port!\n");
+        printf("\n Error binding port!\n\n");
         closeSocket(new, 1);
         return NULL;
     }
     if(listen(new->fd, queue_size)==-1){
-        printf("Error on commanding Kernel to accept incoming connections...\n");
+        printf("\n Error on commanding Kernel to accept incoming connections...\n\n");
         closeSocket(new, 1);
         return NULL;
     }
@@ -271,7 +271,7 @@ Socket *TCPserverAccept(Socket *sock){
 
     Socket *new = (Socket*)calloc(1, sizeof(Socket));
     if((newfd=accept(sock->fd, &addr, &addrlen))==-1){
-        printf("[FD: %d] Error accepting connections...\n", sock->fd);
+        printf("\n [FD: %d] Error accepting connections...\n\n", sock->fd);
         return NULL;
     }
 

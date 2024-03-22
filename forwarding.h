@@ -4,12 +4,12 @@
 #ifndef FOWA_H_
 #define FOWA_H_
 
-typedef struct _encaminhamento
-{
-    char ***routing;
-    char **shorter_path;
-    char **forwarding;
-} Encaminhamento;
+typedef struct _encaminhamento {
+    char ***routing;        // Pointer to a 3D array representing routing information
+    char **shorter_path;    // Pointer to a 2D array representing shorter paths
+    char **forwarding;      // Pointer to a 2D array representing forwarding information
+} Encaminhamento; 
+
 
 /**
  * @brief Creates an encaminhamento struct. Fills the entries related to our

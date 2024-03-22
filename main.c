@@ -41,7 +41,7 @@ int main(int argc, char *argv[]) {
      * When any of them indicates activity, the listenSelect function unblocks and we handle that respective fd.
      */
     while (loop) {
-        if (!listenSelect(s, -1)) printf("Timed out!\n");
+        if (!listenSelect(s, -1)) printf("\n Timed out!\n\n");
         else {
             // Keyboard Input
             if (checkFD(s, 0)) 
@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
             if ((n->succSOCK != NULL) && checkFD(s, getFD_Socket(n->succSOCK))) {
                 if (Recieve(n->succSOCK, buffer) == 0) {
                     // Successor disconnected
-                    printf("Succ disconnected!\n");
+                    printf("\n Succ disconnected!\n\n");
                     handleSuccDisconnect(n, s);
                 } else {
                     // Handle remaining commands from successor
