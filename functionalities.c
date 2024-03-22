@@ -517,7 +517,7 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
         if (aux_ip != NULL) free (aux_ip);
         return;
     }
-
+    if (aux_ip != NULL) free (aux_ip);
     // Handle the case when the successor ID is the same as the current node's ID
     if(strcmp(n->succID, n->selfID) == 0){
         // Set the new node as predecessor and successor
@@ -568,7 +568,6 @@ void handleENTRY(Nodes *n, Socket *new_node, Select *s, char *msg){
         // Send paths to the new predecessor
         sendAllPaths(n->predSOCK, n->selfID);
     }
-    if (aux_ip != NULL) free (aux_ip);
 }
 
 // Handles the disconnection of the successor node. Determines the appropriate actions to take based on the current network state.
